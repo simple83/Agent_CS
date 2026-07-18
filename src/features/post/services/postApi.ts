@@ -1,6 +1,6 @@
 import type { PostEntity, CreatePostParams } from '../types/post.type';
 
-const BASE_URL = import.meta.env.BASE_URL || '';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const getAuthHeader = (): { Authorization: string } => {
     //localStorage 에서 토큰을 확인하여 이미 로그인했는지 확인
