@@ -14,7 +14,7 @@ export interface PostEntity {
   like_count: number;        // 추천 수
   comment_count: number;     // 댓글 수
   author_id: number;
-  author_name: string;
+  account_id: string;
   is_deleted: boolean;       // Soft Delete 여부
   created_at: string;
   updated_at: string;

@@ -1,8 +1,14 @@
 import { usePostList } from '../hooks/usePostList';
-import type { PostEntity, PostCategory } from '../types/post.types';
+import { PostCard } from './PostCard';
+import type { PostCategory } from '../types/post.type';
 
 export const PostList = () => {
   const { posts, currentCategory, isLoading, error, changeCategory } = usePostList();
+
+  // 게시글 클릭 시 이동 핸들러 예시
+  const handlePostClick = (postId: number) => {
+    console.log(`게시글 상세 페이지로 이동: ${postId}`);
+  };
 
   // 헤더
   const RenderHeader = () => (
@@ -47,26 +53,6 @@ export const PostList = () => {
     );
   };
 
-  // 개별 게시글 카드
-  const PostCard = ({ post }: { post: PostEntity }) => (
-    <article style={styles.card}>
-      <span style={styles.cardBadge}>{post.category}</span>
-      <h3 style={styles.cardTitle}>{post.title}</h3>
-      <p style={styles.cardContent}>{post.content}</p>
-      
-      <div style={styles.cardMetaContainer}>
-        <div>
-          by <span style={styles.cardAuthor}>{post.author_name}</span>
-        </div>
-        <div style={styles.cardStats}>
-          <span>👀 {post.view_count}</span>
-          <span>👍 {post.like_count}</span>
-          <span>💬 {post.comment_count}</span>
-        </div>
-      </div>
-    </article>
-  );
-
   // 상태 메시지
   const RenderStatusMessage = () => {
     if (isLoading) return <div style={styles.loadingText}>🔄 게시글 목록을 불러오는 중입니다...</div>;
@@ -87,7 +73,11 @@ export const PostList = () => {
       {!isLoading && (
         <div style={styles.feedContainer}>
           {posts.map((post) => (
-            <PostCard key={post.post_id} post={post} />
+            <PostCard 
+              key={post.post_id} 
+              post={post} 
+              onClick={handlePostClick}
+              />
           ))}
         </div>
       )}
