@@ -21,7 +21,7 @@ export const postApi = {
     게시글 목록 조회 (카테고리 필터링 지원)
     GET /posts?tag=FREE 형식으로 호출
 */
-    getposts: async (category?: string): Promise<PostEntity[]> => {
+    getPosts: async (category?: string): Promise<PostEntity[]> => {
         const queryParam = category ? `?tag=${category}` : '';
         
         const response = 
