@@ -18,7 +18,7 @@ export const usePostList = (initialCategory?: PostCategory) => {
     setError(null);
     try {
       // 서버 데이터 비동기 대기
-      const data = await postApi.getposts(category);
+      const data = await postApi.getPosts(category);
       setPosts(data); // 성공시 게시글 데이터 상태 업데이트
     } catch (err: any) {
       // 실패시 에러 메시지 보관
