@@ -1,14 +1,30 @@
-// POST /auth/login Request Body
 export interface LoginRequest {
   account_id: string;
-  password:  string;
+  password: string;
 }
 
-// POST /auth/login Response Body
 export interface LoginResponse {
-  access_token:  string;
+  access_token: string;
   refresh_token: string;
-  token_type:    string; // "bearer"
-  user_id:       number;
-  account_id:    string;
+  token_type: string;
+  user_id: number;
+  account_id: string;
+}
+
+export interface RefreshRequest {
+  refresh_token: string;
+}
+
+export interface RefreshResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+export interface LogoutRequest {
+  refresh_token: string;
+}
+
+export interface DetailResponse {
+  detail: string;
 }

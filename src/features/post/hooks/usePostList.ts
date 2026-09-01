@@ -1,56 +1,56 @@
-//게시글 목록 조회, 카테고리 변경, 검색 제어
-
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { postApi } from '../services/postApi';
-import type { PostEntity, PostCategory } from '../types/post.type';
+import type { PostEntity, PostQueryParams } from '../types/post.types';
 
-export const usePostList = (initialCategory?: PostCategory) => {
-  //상태(State) 정의
+export const usePostList = (initialParams: PostQueryParams = {}) => {
   const [posts, setPosts] = useState<PostEntity[]>([]);
-  const [currentCategory, setCurrentCategory] = useState<PostCategory | undefined>(initialCategory);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [filters, setFilters] = useState<PostQueryParams>(initialParams);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-
-  // 비동기 데이터 로드 함수 (Promise 핸들링)
-  const fetchPosts = async (category?: PostCategory) => {
+  const fetchPosts = useCallback(async (params: PostQueryParams) => {
     setIsLoading(true);
     setError(null);
+
     try {
-      // 서버 데이터 비동기 대기
-      const data = await postApi.getPosts(category);
-      setPosts(data); // 성공시 게시글 데이터 상태 업데이트
-    } catch (err: any) {
-      // 실패시 에러 메시지 보관
-      setError(err.message || '게시글 목록을 불러오는 중 오류가 발생했습니다.');
+      const data = await postApi.getPosts(params);
+      setPosts(data);
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : '게시글 목록을 불러오는 중 오류가 발생했습니다.',
+      );
     } finally {
-      setIsLoading(false); // 성공하든 실패하든 로딩 종료
+      setIsLoading(false);
     }
-  };
-
-
-  // 사용자가 카테고리 탭을 변경할 때 호출할 제어 함수
-  const changeCategory = (category: PostCategory | undefined) => {
-    setCurrentCategory(category);
-    // 카테고리 상태를 바꾸면서 서버에 해당 카테고리 글을 새로 요청
-    fetchPosts(category);
-  };
-
-
-  // 컴포넌트가 처음 화면에 나타날 때 자동으로 첫 데이터를 로드
-  useEffect(() => {
-    fetchPosts(currentCategory);
-    // 의존성 배열을 비워두어 처음 켜질 때 한 번만 실행
   }, []);
 
-  
-  // Boundary에서 필요한 데이터 반환
+  useEffect(() => {
+    void fetchPosts(initialParams);
+    // 최초 진입 시 initialParams 기준으로 한 번만 조회한다.
+    // 호출 측에서 동적으로 initialParams를 바꿀 필요가 생기면 별도 정책을 정하는 편이 안전하다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchPosts]);
+
+  const search = async (params: PostQueryParams) => {
+    const normalizedParams = {
+      title: params.title?.trim() || undefined,
+      tag: params.tag?.trim() || undefined,
+    };
+
+    setFilters(normalizedParams);
+    await fetchPosts(normalizedParams);
+  };
+
+  const refresh = () => fetchPosts(filters);
+
   return {
     posts,
-    currentCategory,
+    filters,
     isLoading,
     error,
-    changeCategory,
-    refresh: () => fetchPosts(currentCategory) // 수동 새로고침 함수
+    search,
+    refresh,
   };
 };

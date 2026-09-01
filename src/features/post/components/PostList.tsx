@@ -1,83 +1,62 @@
+import { useState, type FormEvent } from 'react';
 import { usePostList } from '../hooks/usePostList';
 import { PostCard } from './PostCard';
-import type { PostCategory } from '../types/post.type';
 
-export const PostList = () => {
-  const { posts, currentCategory, isLoading, error, changeCategory } = usePostList();
+interface PostListProps {
+  onPostClick?: (postId: number) => void;
+}
 
-  // 게시글 클릭 시 이동 핸들러 예시
-  const handlePostClick = (postId: number) => {
-    console.log(`게시글 상세 페이지로 이동: ${postId}`);
+export const PostList = ({ onPostClick }: PostListProps) => {
+  const { posts, isLoading, error, search } = usePostList();
+  const [title, setTitle] = useState('');
+  const [tag, setTag] = useState('');
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    void search({ title, tag });
   };
-
-  // 헤더
-  const RenderHeader = () => (
-    <header style={styles.header}>
-      <h2 style={styles.headerTitle}>📋 커뮤니티 게시판</h2>
-      <p style={styles.headerSubtitle}>다양한 카테고리의 글을 확인해 보세요.</p>
-    </header>
-  );
-
-  // 카테고리 탭
-  const RenderCategoryTabs = () => {
-    const categories: { label: string; value: PostCategory | undefined }[] = [
-      { label: '전체', value: undefined },
-      { label: '자유', value: 'FREE' },
-      { label: '코드리뷰', value: 'CODE_REVIEW' },
-      { label: '밥친구', value: 'MEAL_MATE' },
-      { label: '강의정보', value: 'LECTURE_INFO' },
-      { label: '취업', value: 'JOB' },
-    ];
-
-    return (
-      <div style={styles.tabContainer}>
-        {categories.map((cat) => {
-          const isSelected = currentCategory === cat.value;
-          return (
-            <button
-              key={cat.label}
-              onClick={() => changeCategory(cat.value)}
-              style={{
-                ...styles.tabButton,
-                backgroundColor: isSelected ? '#007bff' : '#f8f9fa',
-                color: isSelected ? '#ffffff' : '#495057',
-                border: isSelected ? '1px solid #007bff' : '1px solid #ced4da',
-                fontWeight: isSelected ? 'bold' : 'normal',
-              }}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // 상태 메시지
-  const RenderStatusMessage = () => {
-    if (isLoading) return <div style={styles.loadingText}>🔄 게시글 목록을 불러오는 중입니다...</div>;
-    if (error) return <div style={styles.errorBox}>⚠️ {error}</div>;
-    if (posts.length === 0) return <div style={styles.emptyText}>등록된 게시글이 없습니다. 첫 글의 주인공이 되어보세요!</div>;
-    return null;
-  };
-
-
 
   return (
     <div style={styles.container}>
-      <RenderHeader />
-      <RenderCategoryTabs />
-      <RenderStatusMessage />
+      <header style={styles.header}>
+        <h2 style={styles.headerTitle}>📋 커뮤니티 게시판</h2>
+        <p style={styles.headerSubtitle}>
+          제목과 해시태그로 게시글을 검색할 수 있습니다.
+        </p>
+      </header>
 
-      {/* 게시글 목록 피드 */}
-      {!isLoading && (
+      <form onSubmit={handleSearch} style={styles.searchForm}>
+        <input
+          type="search"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          placeholder="제목 검색"
+          style={styles.searchInput}
+        />
+        <input
+          type="search"
+          value={tag}
+          onChange={(event) => setTag(event.target.value.replace(/^#/, ''))}
+          placeholder="해시태그 검색 (예: React)"
+          style={styles.searchInput}
+        />
+        <button type="submit" disabled={isLoading} style={styles.searchButton}>
+          검색
+        </button>
+      </form>
+
+      {isLoading && (
+        <div style={styles.loadingText}>🔄 게시글 목록을 불러오는 중입니다...</div>
+      )}
+      {error && <div style={styles.errorBox}>⚠️ {error}</div>}
+      {!isLoading && !error && posts.length === 0 && (
+        <div style={styles.emptyText}>조건에 맞는 게시글이 없습니다.</div>
+      )}
+
+      {!isLoading && !error && posts.length > 0 && (
         <div style={styles.feedContainer}>
           {posts.map((post) => (
-            <PostCard 
-              key={post.post_id} 
-              post={post} 
-              onClick={handlePostClick}
-              />
+            <PostCard key={post.id} post={post} onClick={onPostClick} />
           ))}
         </div>
       )}
@@ -85,8 +64,6 @@ export const PostList = () => {
   );
 };
 
-
-// 스타일
 const styles = {
   container: {
     padding: '20px',
@@ -95,7 +72,7 @@ const styles = {
     fontFamily: 'sans-serif',
   },
   header: {
-    marginBottom: '30px',
+    marginBottom: '24px',
     borderBottom: '2px solid #333',
     paddingBottom: '10px',
   },
@@ -108,72 +85,37 @@ const styles = {
     fontSize: '14px',
     marginTop: '5px',
   },
-  tabContainer: {
-    display: 'flex',
+  searchForm: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr auto',
     gap: '8px',
-    marginBottom: '25px',
-    flexWrap: 'wrap' as const,
+    marginBottom: '24px',
   },
-  tabButton: {
+  searchInput: {
+    minWidth: 0,
+    padding: '10px 12px',
+    border: '1px solid #ced4da',
+    borderRadius: '8px',
+    fontSize: '14px',
+  },
+  searchButton: {
     padding: '10px 18px',
-    borderRadius: '20px',
+    border: 'none',
+    borderRadius: '8px',
+    backgroundColor: '#007bff',
+    color: '#fff',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
   },
   feedContainer: {
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '20px',
   },
-  card: {
-    border: '1px solid #dee2e6',
-    padding: '20px',
-    borderRadius: '12px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-    backgroundColor: '#ffffff',
-  },
-  cardBadge: {
-    fontSize: '11px',
-    fontWeight: 'bold',
-    color: '#4c6ef5',
-    backgroundColor: '#edf2ff',
-    padding: '4px 8px',
-    borderRadius: '4px',
-    textTransform: 'uppercase' as const,
-  },
-  cardTitle: {
-    margin: '12px 0 8px 0',
-    color: '#212529',
-    fontSize: '18px',
-  },
-  cardContent: {
-    color: '#495057',
-    margin: '0 0 15px 0',
-    fontSize: '15px',
-    lineHeight: '1.5',
-  },
-  cardMetaContainer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    fontSize: '13px',
-    color: '#868e96',
-    borderTop: '1px solid #f1f3f5',
-    paddingTop: '12px',
-  },
-  cardAuthor: {
-    fontWeight: 'bold',
-    color: '#495057',
-  },
-  cardStats: {
-    display: 'flex',
-    gap: '12px',
-  },
   loadingText: {
     textAlign: 'center' as const,
     padding: '20px 0',
     color: '#007bff',
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
   },
   errorBox: {
     padding: '15px',
@@ -185,7 +127,7 @@ const styles = {
   },
   emptyText: {
     textAlign: 'center' as const,
-    padding: '4px 0',
+    padding: '24px 0',
     color: '#868e96',
   },
 };
