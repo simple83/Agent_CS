@@ -1,14 +1,50 @@
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router';
+
 import { useState } from 'react'
-import { LoginForm } from './features/auth/components/LoginForm'
+import { LoginPage } from './pages/LoginPage'
+import { PostListPage } from './pages/PostListPage';
+import { PostCreatePage } from './pages/PostCreatePage';
+import { PostDetailPage } from './pages/PostDetailPage';
 import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
 
   return (
-    <>
-      <LoginForm></LoginForm>
-    </>
+    <BrowserRouter>
+      <Routes>
+
+        <Route
+          path="/"
+          element={<Navigate to="/posts" replace />}
+        />
+
+        <Route
+          path="/login"
+          element={<LoginPage />}
+        />
+
+        <Route
+          path="/posts"
+          element={<PostListPage />}
+        />
+
+        <Route
+          path="/posts/create"
+          element={<PostCreatePage />}
+        />
+
+        <Route
+          path="/posts/:postId"
+          element={<PostDetailPage />}
+        />
+        
+      </Routes>
+    </BrowserRouter>
   )
 }
 
