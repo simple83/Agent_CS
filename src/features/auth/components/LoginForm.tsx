@@ -26,82 +26,50 @@ export const LoginForm: FC = () => {
     }
   };
 
-  //헤더
-  const RenderHeader = () => (
-    <header style={styles.header}>
-      <h2 style={styles.title}>로그인</h2>
-    </header>
-  );
-
-  //입력 필드
-  const LoginInput = ({ 
-    type, 
-    placeholder, 
-    value, 
-    onChange, 
-    disabled 
-  }: {
-    type: 'text' | 'password';
-    placeholder: string;
-    value: string;
-    onChange: (e: ChangeEvent<HTMLInputElement>) => void;
-    disabled: boolean;
-  }) => (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      style={styles.input}
-    />
-  );
-
-  //제출 버튼
-  const SubmitButton = () => (
-    <button 
-      type="submit" 
-      disabled={isLoading}
-      style={{
-        ...styles.button,
-        backgroundColor: isLoading ? '#ccc' : '#007bff',
-        cursor: isLoading ? 'not-allowed' : 'pointer',
-      }}
-    >
-      {isLoading ? '로그인 요청 중...' : '로그인'}
-    </button>
-  );
-
-  //에러 메시지
-  const ErrorMessage = () => {
-    if (!error) return null;
-    return <p style={styles.errorMessage}>{error}</p>;
-  };
-
 
   return (
     <div style={styles.container}>
-      <RenderHeader />
+      <header style={styles.header}>
+        <h2 style={styles.title}></h2>
+      </header>
 
       <form onSubmit={handleLoginSubmit} style={styles.form}>
-        <LoginInput 
+        <input 
           type="text" 
           placeholder="아이디(account_id)" 
           value={accountId} 
           onChange={(e) => setAccountId(e.target.value)} 
           disabled={isLoading} 
+          style={styles.input}
         />
 
-        <LoginInput 
+        <input 
           type="password" 
           placeholder="비밀번호" 
           value={password} 
           onChange={(e) => setPassword(e.target.value)} 
-          disabled={isLoading} 
+          disabled={isLoading}
+          style={styles.input}
         />
 
-        <SubmitButton />
-        <ErrorMessage />
+        <button
+          type="submit"
+          disabled={isLoading}
+          style={{
+            ...styles.button,
+            backgroundColor: isLoading ? '#ccc' : '#007bff',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {isLoading ? '로그인 요청 중...' : '로그인'}
+        </button>
+
+        {error && (
+          <p style={styles.errorMessage}>
+            {error}
+          </p>
+        )}
+
       </form>
     </div>
   );
@@ -129,19 +97,25 @@ const styles = {
     gap: '12px',
   },
   input: {
-    padding: '12px',
-    fontSize: '15px',
+    width: '100%',
+    height: '52px',
+    padding: '0 16px',
+    fontSize: '17px',
     border: '1px solid #ced4da',
-    borderRadius: '6px',
+    borderRadius: '8px',
     outline: 'none',
+    boxSizing: 'border-box' as const,
   },
   button: {
-    padding: '12px',
-    fontSize: '16px',
+    width: '100%',
+    height: '52px',
+    padding: '0 16px',
+    fontSize: '17px',
     fontWeight: 'bold' as const,
     color: '#ffffff',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '8px',
+    boxSizing: 'border-box' as const,
     transition: 'background-color 0.2s ease',
   },
   errorMessage: {
