@@ -1,4 +1,5 @@
 import { usePostDetail } from '../hooks/usePostDetail';
+import { PostContent } from './PostContent';
 
 interface PostDetailProps {
   postId: number;
@@ -53,9 +54,7 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
         </div>
       )}
 
-      <div style={styles.content}>
-        {post.content}
-      </div>
+      <PostContent content={post.content} /> 
 
       {post.hashtags.length > 0 && (
         <div style={styles.hashtags}>
