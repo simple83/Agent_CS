@@ -7,78 +7,78 @@ interface PostCardProps {
   onLike?: (postId: number, event: MouseEvent<HTMLButtonElement>) => void;
 }
 
-export const PostCard = ({ post, onClick, onLike }: PostCardProps) => {
-  const HashtagGroup = () => {
-    if (post.hashtags.length === 0) return null;
+const HashtagGroup = ({ post }: { post: PostEntity }) => {
+  if (post.hashtags.length === 0) return null;
 
-    return (
-      <div style={styles.hashtagContainer}>
-        {post.hashtags.slice(0, 3).map((hashtag) => (
-          <span key={hashtag.id} style={styles.badge}>
-            #{hashtag.name}
-          </span>
-        ))}
-      </div>
-    );
-  };
-
-  const AuthorMeta = () => (
-    <div style={styles.authorContainer}>
-      <span style={styles.authorName}>
-        {post.author_username || post.author_account_id}
-      </span>
-      <span style={styles.accountId}>@{post.author_account_id}</span>
-      <span style={styles.createdAt}>
-        {new Date(post.created_at).toLocaleDateString()}
-      </span>
+  return (
+    <div style={styles.hashtagContainer}>
+      {post.hashtags.slice(0, 3).map((hashtag) => (
+        <span key={hashtag.id} style={styles.badge}>
+          #{hashtag.name}
+        </span>
+      ))}
     </div>
   );
+};
 
-  const StatsGroup = () => (
-    <div style={styles.statsContainer}>
-      <span>👀 {post.view_count}</span>
-      {onLike ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onLike(post.id, event);
-          }}
-          style={styles.likeButton}
-        >
-          👍 {post.like_count}
-        </button>
-      ) : (
-        <span>👍 {post.like_count}</span>
+const AuthorMeta = ({ post }: { post: PostEntity }) => (
+  <div style={styles.authorContainer}>
+    <span style={styles.authorName}>
+      {post.author_username || post.author_account_id}
+    </span>
+    <span style={styles.accountId}>@{post.author_account_id}</span>
+    <span style={styles.createdAt}>
+      {new Date(post.created_at).toLocaleDateString()}
+    </span>
+  </div>
+);
+
+const StatsGroup = ({ post, onLike }: Pick<PostCardProps, 'post' | 'onLike'>) => (
+  <div style={styles.statsContainer}>
+    <span>👀 {post.view_count}</span>
+    {onLike ? (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onLike(post.id, event);
+        }}
+        style={styles.likeButton}
+      >
+        👍 {post.like_count}
+      </button>
+    ) : (
+      <span>👍 {post.like_count}</span>
+    )}
+    <span>💬 {post.comment_count}</span>
+  </div>
+);
+
+const ThumbnailImage = ({ post }: { post: PostEntity }) => {
+  if (post.image_urls.length === 0) return null;
+
+  return (
+    <div style={styles.imageWrapper}>
+      <img
+        src={post.image_urls[0]}
+        alt={post.title}
+        style={styles.thumbnail}
+      />
+      {post.image_urls.length > 1 && (
+        <span style={styles.imageCountBadge}>
+          +{post.image_urls.length - 1}
+        </span>
       )}
-      <span>💬 {post.comment_count}</span>
     </div>
   );
+};
 
-  const ThumbnailImage = () => {
-    if (post.image_urls.length === 0) return null;
-
-    return (
-      <div style={styles.imageWrapper}>
-        <img
-          src={post.image_urls[0]}
-          alt={post.title}
-          style={styles.thumbnail}
-        />
-        {post.image_urls.length > 1 && (
-          <span style={styles.imageCountBadge}>
-            +{post.image_urls.length - 1}
-          </span>
-        )}
-      </div>
-    );
-  };
-
+export const PostCard = ({ post, onClick, onLike }: PostCardProps) => {
   return (
     <article onClick={() => onClick?.(post.id)} style={styles.cardContainer}>
       <div style={styles.cardHeader}>
-        <HashtagGroup />
-        <AuthorMeta />
+        <HashtagGroup post={post} />
+        <AuthorMeta post={post} />
       </div>
 
       <div style={styles.cardBody}>
@@ -86,11 +86,11 @@ export const PostCard = ({ post, onClick, onLike }: PostCardProps) => {
           <h3 style={styles.title}>{post.title}</h3>
           <p style={styles.content}>{post.content}</p>
         </div>
-        <ThumbnailImage />
+        <ThumbnailImage post={post} />
       </div>
 
       <div style={styles.cardFooter}>
-        <StatsGroup />
+        <StatsGroup post={post} onLike={onLike} />
       </div>
     </article>
   );
