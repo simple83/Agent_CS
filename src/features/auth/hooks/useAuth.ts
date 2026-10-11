@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { authApi } from '../services/authApi';
+import { authStorage } from '../../../shared/services/authStorage';
 import type { LoginRequest, LoginResponse } from '../types/auth.types';
 
 export const useAuth = () => {
@@ -15,10 +16,7 @@ export const useAuth = () => {
       const loginData = await authApi.login(credentials);
       setUser(loginData);
 
-      localStorage.setItem('access_token', loginData.access_token);
-      localStorage.setItem('refresh_token', loginData.refresh_token);
-      localStorage.setItem('user_id', String(loginData.user_id));
-      localStorage.setItem('account_id', loginData.account_id);
+      authStorage.saveLogin(loginData);
 
       return true;
     } catch (err: unknown) {
@@ -32,7 +30,7 @@ export const useAuth = () => {
   };
 
   const refreshAccessToken = async (): Promise<boolean> => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const refreshToken = authStorage.getRefreshToken();
 
     if (!refreshToken) {
       setError('refresh token이 없습니다. 다시 로그인해주세요.');
@@ -44,8 +42,7 @@ export const useAuth = () => {
 
     try {
       const refreshed = await authApi.refresh({ refresh_token: refreshToken });
-      localStorage.setItem('access_token', refreshed.access_token);
-      localStorage.setItem('refresh_token', refreshed.refresh_token);
+      authStorage.saveTokens(refreshed);
       return true;
     } catch (err: unknown) {
       setError(
@@ -58,10 +55,10 @@ export const useAuth = () => {
   };
 
   const logout = async (): Promise<boolean> => {
-    const refreshToken = localStorage.getItem('refresh_token');
+    const refreshToken = authStorage.getRefreshToken();
 
     if (!refreshToken) {
-      clearStoredAuth();
+      authStorage.clear();
       setUser(null);
       return true;
     }
@@ -71,7 +68,7 @@ export const useAuth = () => {
 
     try {
       await authApi.logout({ refresh_token: refreshToken });
-      clearStoredAuth();
+      authStorage.clear();
       setUser(null);
       return true;
     } catch (err: unknown) {
@@ -92,11 +89,4 @@ export const useAuth = () => {
     logout,
     refreshAccessToken,
   };
-};
-
-const clearStoredAuth = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user_id');
-  localStorage.removeItem('account_id');
 };

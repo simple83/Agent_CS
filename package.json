@@ -4,10 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vite --mode real",
+    "dev:real": "vite --mode real",
+    "dev:mock": "vite --mode mock",
+    "build": "tsc -b && vite build --mode production",
+    "build:mock": "tsc -b && vite build --mode mock --outDir dist-mock",
+    "test:api": "node --test tests/api.test.mjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:mock": "vite preview --outDir dist-mock"
   },
   "dependencies": {
     "highlight.js": "^11.12.0",

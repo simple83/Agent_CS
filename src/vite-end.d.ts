@@ -2,7 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string;
-  // 필요에 따라 추가 환경 변수 타입을 정의
+  readonly VITE_USE_MOCK_API?: string;
+  readonly VITE_MOCK_DELAY_MS?: string;
 }
 
 interface ImportMeta {
