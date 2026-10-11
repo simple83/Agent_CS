@@ -5,7 +5,6 @@ import {
   Navigate,
 } from 'react-router';
 
-import { useState } from 'react'
 import { LoginPage } from './pages/LoginPage'
 import { PostListPage } from './pages/PostListPage';
 import { PostCreatePage } from './pages/PostCreatePage';

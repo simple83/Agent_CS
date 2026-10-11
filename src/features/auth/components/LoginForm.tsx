@@ -1,4 +1,4 @@
-import type { FC, FormEvent, ChangeEvent } from 'react';
+import type { FC, FormEvent } from 'react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
