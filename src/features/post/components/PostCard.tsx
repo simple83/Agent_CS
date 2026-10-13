@@ -75,7 +75,20 @@ const ThumbnailImage = ({ post }: { post: PostEntity }) => {
 
 export const PostCard = ({ post, onClick, onLike }: PostCardProps) => {
   return (
-    <article onClick={() => onClick?.(post.id)} style={styles.cardContainer}>
+    <article
+      className="post-card"
+      onClick={() => onClick?.(post.id)}
+      role={onClick ? 'link' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `${post.title} 상세 보기` : undefined}
+      onKeyDown={(event) => {
+        // 카드 안의 좋아요 버튼에서 발생한 키 입력은 상세 이동으로 처리하지 않는다.
+        if (event.target === event.currentTarget && event.key === 'Enter') {
+          onClick?.(post.id);
+        }
+      }}
+      style={styles.cardContainer}
+    >
       <div style={styles.cardHeader}>
         <HashtagGroup post={post} />
         <AuthorMeta post={post} />

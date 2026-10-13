@@ -1,3 +1,31 @@
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-nav a {
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: var(--text-h);
+  text-decoration: none;
+}
+
+.app-nav a:hover,
+.app-nav a[aria-current="page"] {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.app-nav a:focus-visible,
+.post-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;

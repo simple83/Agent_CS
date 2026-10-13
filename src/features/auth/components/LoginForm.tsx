@@ -2,7 +2,11 @@ import type { FC, FormEvent } from 'react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
-export const LoginForm: FC = () => {
+interface LoginFormProps {
+  onLoggedIn?: () => void;
+}
+
+export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
   const [accountId, setAccountId] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   
@@ -22,7 +26,7 @@ export const LoginForm: FC = () => {
     });
 
     if (isSuccess) {
-      alert('로그인이 완료되었습니다!');
+      onLoggedIn?.();
     }
   };
 
@@ -30,7 +34,7 @@ export const LoginForm: FC = () => {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h2 style={styles.title}></h2>
+        <h2 style={styles.title}>로그인</h2>
       </header>
 
       <form onSubmit={handleLoginSubmit} style={styles.form}>
