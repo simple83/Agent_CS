@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build --mode production",
     "build:mock": "tsc -b && vite build --mode mock --outDir dist-mock",
     "test:api": "node --test tests/api.test.mjs",
+    "test:hooks": "node --test tests/post-hooks.test.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:mock": "vite preview --outDir dist-mock"
@@ -32,6 +33,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "jsdom": "^30.1.2",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"

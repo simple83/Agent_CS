@@ -13,6 +13,8 @@ npm run dev:mock
 
 API 검사: `npm run test:api`
 
+게시글 Hook 상태 전환 검사: `npm run test:hooks` (백엔드 없이 최초 조회, 검색·새로고침, 요청 간 응답 순서 검증)
+
 ## Vite 템플릿 참고
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
