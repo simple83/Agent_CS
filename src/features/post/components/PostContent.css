@@ -1,4 +1,6 @@
+/* 본문 공통 가독성. 일반 문단은 줄바꿈을 보존하고 코드 블록만 별도의 가로 스크롤을 사용한다. */
 .post-content {
+  text-align: left;
   font-size: 16px;
   line-height: 1.7;
   color: #212529;
@@ -37,3 +39,22 @@
     "Courier New",
     monospace;
 }
+
+/* 상세와 작성 미리보기에서 동일한 코드블록 도구를 사용한다. */
+.post-content { color: var(--text-h); overflow-wrap: anywhere; }
+.post-content p { margin: 12px 0; }
+.post-content h1, .post-content h2, .post-content h3 { line-height: 1.4; }
+.post-content h1 { font-size: 28px; }
+.post-content img { max-width: 100%; height: auto; }
+.post-content blockquote { margin: 16px 0; border-left: 3px solid #6387df; padding-left: 16px; color: var(--text); }
+
+/* 언어/복사 도구와 코드를 한 상자로 묶고 하이라이트 테마에 맞는 배경을 유지한다. */
+.post-code-block { margin: 16px 0; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; background: #0d1117; color: #e6edf3; }
+.post-code-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #30363d; font-size: 12px; }
+.post-code-toolbar button { background: #21262d; border: 1px solid #484f58; border-radius: 4px; color: #e6edf3; padding: 4px 10px; cursor: pointer; }
+.post-code-toolbar button:focus-visible { outline: 2px solid #6387df; outline-offset: 2px; }
+
+/* 전역 code의 inline-flex/패딩을 덮어써 코드 줄이 뭉개지거나 강제로 줄바꿈되지 않게 한다. */
+.post-content .post-code-block pre { margin: 0; border-radius: 0; padding: 16px; overflow-x: auto; white-space: pre; }
+.post-content .post-code-block pre code { display: block; padding: 0; border-radius: 0; background: transparent; color: inherit; white-space: pre; tab-size: 4; overflow-wrap: normal; }
+.post-content .post-copy-status { margin: 0; padding: 8px 12px; font-size: 12px; border-top: 1px solid #30363d; }

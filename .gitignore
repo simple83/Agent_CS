@@ -1,4 +1,4 @@
-# Logs
+# 실행/패키지 관리자 로그는 버전 관리에서 제외한다.
 logs
 *.log
 npm-debug.log*
@@ -7,13 +7,22 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# 설치 의존성·빌드 결과·시연 패키지·개인 환경 파일은 저장소에 올리지 않는다.
 node_modules
 dist
 dist-mock
 dist-ssr
+demo-output
+# 로컬 발표/검토에만 쓰는 도구와 설명 문서는 업로드하지 않는다.
+/scripts/demo/
+/scripts/package-demo.mjs
+/tests/demo-server.test.mjs
+/DEMO_GUIDE.md
+/CODE_REVIEW.md
+desktop.ini
 *.local
 
-# Editor directories and files
+# 편집기와 운영체제가 생성하는 개인 설정/임시 파일을 제외한다.
 .vscode/*
 !.vscode/extensions.json
 .idea

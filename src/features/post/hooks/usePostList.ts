@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { postApi } from '../services/postApi';
 import type { PostEntity, PostQueryParams } from '../types/post.types';
 
+/**
+ * 목록의 최초 조회·검색·재조회를 구분해 관리한다. 처음에는 빈 목록이 아니라 로딩 상태로 시작한다.
+ * 요청 번호를 비교해 늦게 도착한 이전 응답이 최신 검색 결과를 덮어쓰지 못하게 한다.
+ */
 export const usePostList = (initialParams: PostQueryParams = {}) => {
   // initialParams는 최초 조회 조건이다. 이후 조건 변경은 search로 처리한다.
   const [initialFilters] = useState(initialParams);
@@ -13,6 +17,7 @@ export const usePostList = (initialParams: PostQueryParams = {}) => {
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
 
+  /** API 요청마다 번호를 올린다. 최신 요청의 성공/실패만 반영하며 실제 네트워크를 취소하지는 않는다. */
   const fetchPosts = useCallback((params: PostQueryParams) => {
     const currentRequestId = ++requestId.current;
 
@@ -34,6 +39,7 @@ export const usePostList = (initialParams: PostQueryParams = {}) => {
     );
   }, []);
 
+  // 마운트 시 한 번 조회한다. 초기 조건은 고정되어 렌더마다 새 객체를 전달해도 재요청하지 않는다.
   useEffect(() => {
     void fetchPosts(initialFilters);
     return () => {
@@ -42,6 +48,7 @@ export const usePostList = (initialParams: PostQueryParams = {}) => {
     };
   }, [fetchPosts, initialFilters]);
 
+  /** 공백 검색값을 정규화해 현재 조건으로 보관하고 새 검색을 시작한다. 이전 오류는 지운다. */
   const search = async (params: PostQueryParams) => {
     const normalizedParams = {
       title: params.title?.trim() || undefined,
@@ -54,6 +61,7 @@ export const usePostList = (initialParams: PostQueryParams = {}) => {
     await fetchPosts(normalizedParams);
   };
 
+  /** 마지막 검색 조건 그대로 재조회한다. 실패 후 재시도에서도 조건이 초기화되지 않는다. */
   const refresh = () => {
     setStatus('refreshing');
     setError(null);

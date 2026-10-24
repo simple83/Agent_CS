@@ -1,133 +1,61 @@
 import { useState, type FormEvent } from 'react';
 import { usePostList } from '../hooks/usePostList';
-import { PostCard } from './PostCard';
+import { POST_CATEGORIES, getPostCategory, type PostCategory } from '../utils/postEditor';
+import './PostBoard.css';
 
 interface PostListProps {
   onPostClick?: (postId: number) => void;
+  category?: PostCategory | '';
+  onCategoryChange?: (category: PostCategory | '') => void;
+  onCreate?: () => void;
 }
 
-export const PostList = ({ onPostClick }: PostListProps) => {
-  const { posts, isLoading, error, search } = usePostList();
+/**
+ * 말머리 필터·검색·표 목록을 표시한다. URL 변경과 화면 이동은 Page에서 전달한 콜백으로 처리한다.
+ * 말머리는 전체 검색 결과에 클라이언트에서 적용한다. 서버가 페이지네이션을 도입하면 이 방식도 수정해야 한다.
+ */
+export const PostList = ({ onPostClick, category = '', onCategoryChange, onCreate }: PostListProps) => {
+  const { posts, isLoading, error, search, refresh } = usePostList();
   const [title, setTitle] = useState('');
   const [tag, setTag] = useState('');
-
+  // API는 태그 하나만 검색한다. 제목/주제 태그 검색 결과 안에서 말머리를 교집합으로 적용한다.
+  const visiblePosts = posts.filter((post) => !category || getPostCategory(post.hashtags) === category);
+  /** 입력 중에는 요청하지 않고 검색 제출 시 두 조건을 함께 Hook에 전달한다. */
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     void search({ title, tag });
   };
 
-  return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <h2 style={styles.headerTitle}>📋 커뮤니티 게시판</h2>
-        <p style={styles.headerSubtitle}>
-          제목과 해시태그로 게시글을 검색할 수 있습니다.
-        </p>
-      </header>
-
-      <form onSubmit={handleSearch} style={styles.searchForm}>
-        <input
-          type="search"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="제목 검색"
-          style={styles.searchInput}
-        />
-        <input
-          type="search"
-          value={tag}
-          onChange={(event) => setTag(event.target.value.replace(/^#/, ''))}
-          placeholder="해시태그 검색 (예: React)"
-          style={styles.searchInput}
-        />
-        <button type="submit" disabled={isLoading} style={styles.searchButton}>
-          검색
-        </button>
-      </form>
-
-      {isLoading && (
-        <div style={styles.loadingText}>🔄 게시글 목록을 불러오는 중입니다...</div>
-      )}
-      {error && <div style={styles.errorBox}>⚠️ {error}</div>}
-      {!isLoading && !error && posts.length === 0 && (
-        <div style={styles.emptyText}>조건에 맞는 게시글이 없습니다.</div>
-      )}
-
-      {!isLoading && !error && posts.length > 0 && (
-        <div style={styles.feedContainer}>
-          {posts.map((post) => (
-            <PostCard key={post.id} post={post} onClick={onPostClick} />
-          ))}
-        </div>
-      )}
+  return <section className="post-board">
+    <header className="board-heading"><h2>컴퓨터공학과 게시판</h2><p>궁금한 코드부터 오늘의 점심 약속까지.</p></header>
+    <div className="board-controls">
+      <div className="board-categories" role="group" aria-label="말머리 필터">
+        <button type="button" aria-pressed={!category} onClick={() => onCategoryChange?.('')}>전체</button>
+        {POST_CATEGORIES.map((item) => <button type="button" key={item} aria-pressed={category === item} onClick={() => onCategoryChange?.(item)}>{item}</button>)}
+      </div>
+      {onCreate && <button type="button" className="board-write" onClick={onCreate}>글쓰기</button>}
     </div>
-  );
-};
-
-const styles = {
-  container: {
-    padding: '20px',
-    maxWidth: '800px',
-    margin: '0 auto',
-    fontFamily: 'sans-serif',
-  },
-  header: {
-    marginBottom: '24px',
-    borderBottom: '2px solid #333',
-    paddingBottom: '10px',
-  },
-  headerTitle: {
-    margin: 0,
-    color: '#333',
-  },
-  headerSubtitle: {
-    color: '#666',
-    fontSize: '14px',
-    marginTop: '5px',
-  },
-  searchForm: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr auto',
-    gap: '8px',
-    marginBottom: '24px',
-  },
-  searchInput: {
-    minWidth: 0,
-    padding: '10px 12px',
-    border: '1px solid #ced4da',
-    borderRadius: '8px',
-    fontSize: '14px',
-  },
-  searchButton: {
-    padding: '10px 18px',
-    border: 'none',
-    borderRadius: '8px',
-    backgroundColor: '#007bff',
-    color: '#fff',
-    cursor: 'pointer',
-  },
-  feedContainer: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '20px',
-  },
-  loadingText: {
-    textAlign: 'center' as const,
-    padding: '20px 0',
-    color: '#007bff',
-    fontWeight: 'bold' as const,
-  },
-  errorBox: {
-    padding: '15px',
-    backgroundColor: '#fff5f5',
-    color: '#e03e3e',
-    borderRadius: '6px',
-    marginBottom: '20px',
-    border: '1px solid #ffe3e3',
-  },
-  emptyText: {
-    textAlign: 'center' as const,
-    padding: '24px 0',
-    color: '#868e96',
-  },
+    <form onSubmit={handleSearch} className="board-search">
+      <input type="search" aria-label="제목 검색" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="제목 검색" />
+      <input type="search" aria-label="주제 태그 검색" value={tag} onChange={(event) => setTag(event.target.value.replace(/^#/, ''))} placeholder="주제 태그 (예: React)" />
+      <button type="submit" disabled={isLoading}>검색</button>
+    </form>
+    {isLoading && <p role="status">게시글 목록을 불러오는 중입니다...</p>}
+    {error && <div className="post-error" role="alert">{error} <button type="button" onClick={() => void refresh()}>다시 시도</button></div>}
+    {!isLoading && !error && visiblePosts.length === 0 && <p className="post-help">조건에 맞는 게시글이 없습니다.</p>}
+    {!isLoading && !error && visiblePosts.length > 0 && <table className="board-table">
+      <caption className="post-help">{category || '전체'} 게시글 {visiblePosts.length}개</caption>
+      <thead><tr><th scope="col">말머리</th><th scope="col">제목</th><th scope="col" className="board-desktop">작성일</th><th scope="col" className="board-desktop">조회</th><th scope="col" className="board-desktop">좋아요</th></tr></thead>
+      <tbody>{visiblePosts.map((post) => <tr key={post.id}>
+        <td><span className="post-category-badge">{getPostCategory(post.hashtags)}</span></td>
+        <td className="board-title-cell">
+          <button type="button" className="board-title-button" onClick={() => onPostClick?.(post.id)}>{post.title}</button>
+          <span className="board-comment-count" aria-label={`댓글 ${post.comment_count}개`}>[{post.comment_count}]</span>
+          <div className="board-row-meta">{post.author_username || post.author_account_id}{post.image_urls.length > 0 && ` · 첨부 이미지 ${post.image_urls.length}개`}</div>
+        </td>
+        <td className="board-desktop">{new Date(post.created_at).toLocaleDateString('ko-KR')}</td>
+        <td className="board-desktop">{post.view_count}</td><td className="board-desktop">{post.like_count}</td>
+      </tr>)}</tbody>
+    </table>}
+  </section>;
 };

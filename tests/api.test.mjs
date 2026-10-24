@@ -2,12 +2,17 @@ import assert from 'node:assert/strict';
 import { after, beforeEach, test } from 'node:test';
 import { createServer } from 'vite';
 
-// Run the actual TypeScript services with Vite's mode resolution, without a backend.
+// Vite 모드 선택을 그대로 사용해 실제 TypeScript 서비스를 실행하되 백엔드 없이 검증한다.
+/** 브라우저 localStorage 계약을 메모리 Map으로 흉내 내어 테스트끼리 저장 데이터가 섞이지 않게 한다. */
 class MemoryStorage {
   values = new Map();
+  /** 저장된 문자열 또는 미존재 시 null을 반환한다. */
   getItem(key) { return this.values.get(key) ?? null; }
+  /** 실제 localStorage처럼 값을 문자열로 바꿔 저장한다. */
   setItem(key, value) { this.values.set(key, String(value)); }
+  /** 지정한 키만 삭제한다. */
   removeItem(key) { this.values.delete(key); }
+  /** 테스트 시작 전에 메모리 저장소 전체를 비운다. */
   clear() { this.values.clear(); }
 }
 
@@ -15,6 +20,7 @@ const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorag
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: new MemoryStorage() });
 const originalFetch = globalThis.fetch;
 const servers = [];
+// 교체한 전역 객체와 Vite 서버를 복구해 다음 테스트 프로세스에 영향을 남기지 않는다.
 after(async () => {
   globalThis.fetch = originalFetch;
   if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
@@ -22,6 +28,7 @@ after(async () => {
   await Promise.all(servers.map((server) => server.close()));
 });
 
+/** 지정 모드로 서비스 모듈을 로드한다. 실제 주소는 테스트용 가짜 주소로 주입하며 지연은 제거한다. */
 async function loadMode(mode, baseUrl) {
   const server = await createServer({
     configFile: false,
@@ -44,17 +51,19 @@ async function loadMode(mode, baseUrl) {
 const mock = await loadMode('mock');
 const real = await loadMode('real', 'https://backend.example.test/api/');
 const unconfiguredReal = await loadMode('real');
+// Mock에서 fetch가 발생하면 즉시 실패시켜 실제 네트워크에 의존하는 코드가 섞이지 않게 한다.
 beforeEach(() => {
   localStorage.clear();
   globalThis.fetch = () => { throw new Error('Unexpected network request'); };
 });
+/** 테스트 계정으로 세션을 만들고 앱과 동일한 저장 함수로 토큰을 보관한다. */
 async function login(account_id = 'jinwoo99') {
   const response = await mock.authApi.login({ account_id, password: 'mock1234' });
   mock.authStorage.saveLogin(response);
   return response;
 }
 
-test('mock mode serves seed data, combined filters, Markdown and missing-post errors without fetch', async () => {
+test('Mock은 네트워크 없이 예제 글·복합 검색·Markdown과 미존재 오류를 처리한다', async () => {
   assert.equal((await mock.postApi.getPosts()).length, 3);
   const posts = await mock.postApi.getPosts({ title: 'react', tag: '#React' });
   assert.equal(posts.length, 1);
@@ -64,7 +73,7 @@ test('mock mode serves seed data, combined filters, Markdown and missing-post er
   await assert.rejects(mock.postApi.getPost(999), /존재하지 않는/);
 });
 
-test('authentication validates credentials, expires access, refreshes and invalidates logout', async () => {
+test('인증은 계정 확인·토큰 만료·갱신·로그아웃 후 무효화를 재현한다', async () => {
   await assert.rejects(mock.authApi.login({ account_id: 'jinwoo99', password: 'wrong' }), /비밀번호/);
   await assert.rejects(mock.postApi.createPost({ title: 'title', content: 'body' }), /로그인/);
   const session = await login();
@@ -82,7 +91,7 @@ test('authentication validates credentials, expires access, refreshes and invali
   await assert.rejects(mock.authApi.refresh({ refresh_token: session.refresh_token }), /유효하지/);
 });
 
-test('create persists Markdown, tags and images; fresh module load reads saved data and session', async () => {
+test('작성한 Markdown·태그·이미지와 세션은 모듈 재로드 후에도 유지된다', async () => {
   await login();
   const content = '본문\n\n```cpp\nint main() {}\n```';
   const post = await mock.postApi.createPost({
@@ -105,7 +114,7 @@ test('create persists Markdown, tags and images; fresh module load reads saved d
   assert.deepEqual(updated.image_urls, []);
 });
 
-test('ownership and soft deletion follow the API contract', async () => {
+test('수정 소유권과 소프트 삭제는 API 계약을 따른다', async () => {
   await login();
   await assert.rejects(mock.postApi.updatePost(2, { title: 'bad' }), /본인이/);
   await assert.rejects(mock.postApi.deletePost(2), /본인이/);
@@ -118,18 +127,40 @@ test('ownership and soft deletion follow the API contract', async () => {
   await mock.postApi.updatePost(2, { title: '두 번째 계정 글 수정' });
 });
 
-test('like state persists, rejects duplicates, and can be undone', async () => {
+test('좋아요는 저장되고 중복 등록을 거부하며 취소할 수 있다', async () => {
+  assert.equal(await mock.postApi.getLikeStatus(2), null);
   await login();
+  assert.equal(await mock.postApi.getLikeStatus(2), false);
   const before = (await mock.postApi.getPost(2)).like_count;
   await mock.postApi.likePost(2);
+  assert.equal(await mock.postApi.getLikeStatus(2), true);
+  const reloaded = await loadMode('mock');
+  assert.equal(await reloaded.postApi.getLikeStatus(2), true);
   await assert.rejects(mock.postApi.likePost(2), /이미/);
   assert.equal((await mock.postApi.getPost(2)).like_count, before + 1);
   await mock.postApi.unlikePost(2);
+  assert.equal(await mock.postApi.getLikeStatus(2), false);
   assert.equal((await mock.postApi.getPost(2)).like_count, before);
   await assert.rejects(mock.postApi.unlikePost(2), /좋아요하지/);
 });
 
-test('input validation and one-shot failure leave data intact and allow retry', async () => {
+test('실제 좋아요 상태는 현재 사용자 목록 API로 읽고 잘못된 응답은 미등록으로 간주하지 않는다', async () => {
+  assert.equal(await real.postApi.getLikeStatus(42), null);
+  real.authStorage.saveLogin({ access_token: 'token', refresh_token: 'refresh', user_id: 7, account_id: 'user' });
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, 'https://backend.example.test/api/users/7/likes/posts');
+    assert.equal(options.headers.Authorization, 'bearer token');
+    return Response.json([{ id: 42 }]);
+  };
+  assert.equal(await real.postApi.getLikeStatus(42), true);
+  assert.equal(await real.postApi.getLikeStatus(43), false);
+  globalThis.fetch = async () => Response.json({ wrong: 'shape' });
+  await assert.rejects(real.postApi.getLikeStatus(42), /응답 형식/);
+  globalThis.fetch = async () => Response.json({ detail: '조회 실패' }, { status: 500 });
+  await assert.rejects(real.postApi.getLikeStatus(42), /조회 실패/);
+});
+
+test('입력 검증과 일회성 실패는 DB를 유지하고 재시도를 허용한다', async () => {
   await login();
   await assert.rejects(mock.postApi.createPost({ title: ' ', content: 'body' }), /제목과 내용/);
   await assert.rejects(mock.postApi.createPost({ title: 'title', content: 'body',
@@ -143,7 +174,7 @@ test('input validation and one-shot failure leave data intact and allow retry', 
   assert.equal((await mock.postApi.getPosts()).length, 4);
 });
 
-test('mock reset preserves real credentials and unrelated storage', async () => {
+test('Mock 초기화는 실제 인증 정보와 다른 저장소 키를 보존한다', async () => {
   real.authStorage.saveLogin({ access_token: 'real-access', refresh_token: 'real-refresh',
     user_id: 7, account_id: 'real-user', token_type: 'bearer' });
   localStorage.setItem('other-app-data', 'keep');
@@ -157,7 +188,7 @@ test('mock reset preserves real credentials and unrelated storage', async () => 
   assert.equal((await mock.postApi.getPosts()).length, 3);
 });
 
-test('real mode uses fetch, encoded queries, bearer auth and unchanged multipart serialization', async () => {
+test('실제 모드는 fetch·인코딩된 검색·bearer 인증·multipart 직렬화를 사용한다', async () => {
   const calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
@@ -165,7 +196,7 @@ test('real mode uses fetch, encoded queries, bearer auth and unchanged multipart
   };
   real.authStorage.saveLogin({ access_token: 'real-token', refresh_token: 'real-refresh',
     user_id: 7, account_id: 'real-user', token_type: 'bearer' });
-  await login(); // The selected Mock implementation must still avoid fetch.
+  await login(); // 실제 모드를 함께 로드해도 Mock 로그인은 fetch를 호출하지 않아야 한다.
   await real.postApi.getPosts({ title: 'a b', tag: 'C++' });
   assert.equal(calls[0].url, 'https://backend.example.test/api/posts?title=a+b&tag=C%2B%2B');
   const file = new File(['png'], 'photo.png', { type: 'image/png' });
@@ -181,7 +212,7 @@ test('real mode uses fetch, encoded queries, bearer auth and unchanged multipart
   await assert.rejects(real.postApi.getPost(42), /server error/);
 });
 
-test('real mode with no configured backend fails clearly without contacting the frontend', async () => {
+test('실제 API 주소가 없으면 프론트 서버로 잘못 요청하지 않고 실패한다', async () => {
   await assert.rejects(unconfiguredReal.postApi.getPosts(), /실제 API 주소가 없습니다/);
   await assert.rejects(unconfiguredReal.authApi.login({ account_id: 'a', password: 'b' }), /실제 API 주소가 없습니다/);
 });

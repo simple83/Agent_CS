@@ -1,3 +1,4 @@
+/* 공통 이동 메뉴: 현재 경로와 키보드 포커스를 구분해서 표시한다. */
 .app-nav {
   display: flex;
   flex-wrap: wrap;
@@ -26,6 +27,7 @@
   outline-offset: 3px;
 }
 
+/* 아래는 Vite 시작 화면의 기존 스타일이다. 현재 App에서는 사용하지 않으며 기능 코드와 구분해 남겨둔다. */
 .counter {
   font-size: 16px;
   padding: 5px 10px;

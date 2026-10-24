@@ -12,11 +12,15 @@ import { PostListPage } from './pages/PostListPage';
 import { PostCreatePage } from './pages/PostCreatePage';
 import './App.css'
 
-// Markdown 및 코드 하이라이트 코드는 상세 페이지 진입 시에만 불러온다.
+// 상세 페이지와 작성 미리보기에서 Markdown/하이라이트 청크를 필요할 때 불러온다.
 const PostDetailPage = lazy(() =>
   import('./pages/PostDetailPage').then((module) => ({ default: module.PostDetailPage })),
 );
 
+/**
+ * 공통 메뉴와 URL별 화면을 연결한다. 상세 화면은 지연 로드해 초기 번들 크기를 줄인다.
+ * 라우팅 자체는 인증 경계가 아니며 작성 권한은 서비스/서버에서 검증한다.
+ */
 function App() {
 
   return (

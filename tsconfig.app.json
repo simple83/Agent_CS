@@ -7,7 +7,7 @@
     "types": ["vite/client"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
+    /* 모듈 변환/파일 출력은 Vite에 맡기고 TypeScript는 앱의 타입만 검사한다. */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
@@ -15,7 +15,7 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
+    /* 사용하지 않는 선언과 switch 누락 등을 빌드 단계에서도 탐지한다. */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,

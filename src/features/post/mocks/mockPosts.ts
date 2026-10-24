@@ -1,6 +1,9 @@
 import type { PostEntity } from '../types/post.types';
 
-// 실제 PostDetailResponse 형태를 따르는 화면 개발용 Mock 데이터
+/**
+ * 실제 PostDetailResponse 형태의 첫 실행/초기화용 예제다. 저장소에서는 복사본을 사용한다.
+ * 친목 글·여러 언어의 코드·일반 글을 포함하며 수치는 시연용이다. 댓글 본문은 아직 구현하지 않았다.
+ */
 export const MOCK_POSTS: PostEntity[] = [
   {
     id: 1,

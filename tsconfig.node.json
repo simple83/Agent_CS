@@ -7,14 +7,14 @@
     "types": ["node"],
     "skipLibCheck": true,
 
-    /* Bundler mode */
+    /* Vite 설정은 번들러 방식으로 모듈을 해석하고 별도의 JS 파일을 출력하지 않는다. */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
 
-    /* Linting */
+    /* 설정 파일에서도 사용하지 않는 선언과 switch 누락 등을 검사한다. */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,

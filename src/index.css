@@ -1,3 +1,4 @@
+/* 전역 색상/글꼴 토큰. 게시판과 편집기는 이 변수를 공유해 운영체제 테마에 맞춰 표시한다. */
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -30,6 +31,7 @@
   }
 }
 
+/* 다크 모드에서는 토큰만 교체한다. 고정 색상을 쓰는 개별 컴포넌트에는 자동 적용되지 않는다. */
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;
@@ -50,6 +52,7 @@
   }
 }
 
+/* 앱 전체의 최대 폭과 최소 높이. box-sizing으로 테두리를 포함해 작은 화면의 넘침을 줄인다. */
 #root {
   width: 1126px;
   max-width: 100%;
@@ -66,6 +69,7 @@ body {
   margin: 0;
 }
 
+/* 공통 제목/문단 기본값. 게시글 상세 제목은 여러 줄 겹침 방지를 위해 자체 줄 높이를 지정한다. */
 h1,
 h2 {
   font-family: var(--heading);
@@ -95,6 +99,7 @@ p {
   margin: 0;
 }
 
+/* 일반 인라인 코드 기본값. Markdown 코드 블록에서는 PostContent.css가 필요한 속성을 덮어쓴다. */
 code,
 .counter {
   font-family: var(--mono);

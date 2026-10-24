@@ -1,4 +1,5 @@
 {
+  // 브라우저 앱과 Node 설정 파일을 각각 검사하도록 프로젝트 참조를 구성한다.
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },

@@ -6,12 +6,17 @@ interface LoginFormProps {
   onLoggedIn?: () => void;
 }
 
+/*
+ * 입력값을 관리하고 로그인 처리는 useAuth에 맡긴다. 성공 후 화면 이동은 부모 콜백이 결정한다.
+ * 입력 요소를 내부 함수 컴포넌트로 만들지 않아 재렌더링 시 입력 포커스가 유지된다.
+ */
 export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
   const [accountId, setAccountId] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   
   const { login, isLoading, error } = useAuth();
 
+  /* 기본 폼 전송을 막고 빈 입력을 검사한다. 비밀번호는 공백을 포함한 원문 그대로 전송한다. */
   const handleLoginSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -80,6 +85,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
 };
 
 
+// 로그인 폼 전용 배치다. as const는 CSS 속성값이 일반 문자열로 넓혀지지 않도록 한다.
 const styles = {
   container: {
     padding: '20px',

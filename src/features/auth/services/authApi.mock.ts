@@ -3,7 +3,9 @@ import {
   MOCK_USERS, readMockDatabase, saveMockDatabase, waitForMockRequest,
 } from '../../../shared/mocks/mockStore';
 
+/** 네트워크 없이 로그인 계약을 재현한다. 평문 시연 계정과 localStorage 세션은 개발 전용이다. */
 export const mockAuthApi: AuthApi = {
+  /** 계정을 대조하고 액세스 1시간/갱신 7일 세션을 발급한다. 만료된 기존 세션은 정리한다. */
   async login(credentials) {
     await waitForMockRequest();
     const user = MOCK_USERS.find((item) => item.account_id === credentials.account_id
@@ -29,6 +31,7 @@ export const mockAuthApi: AuthApi = {
       account_id: user.account_id,
     };
   },
+  /** 갱신 토큰이 유효한 세션의 액세스 토큰만 교체한다. 갱신 토큰과 그 만료일은 유지한다. */
   async refresh({ refresh_token }) {
     await waitForMockRequest();
     const data = readMockDatabase();
@@ -41,6 +44,7 @@ export const mockAuthApi: AuthApi = {
     saveMockDatabase(data);
     return { access_token: session.access_token, refresh_token, token_type: 'bearer' };
   },
+  /** 해당 갱신 토큰의 세션을 삭제한다. 같은 사용자의 다른 로그인 세션은 유지한다. */
   async logout({ refresh_token }) {
     await waitForMockRequest();
     const data = readMockDatabase();
