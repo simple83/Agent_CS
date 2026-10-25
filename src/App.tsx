@@ -4,15 +4,15 @@ import {
   Routes,
   Route,
   Navigate,
-  NavLink,
 } from 'react-router';
 
 import { LoginPage } from './pages/LoginPage'
 import { PostListPage } from './pages/PostListPage';
 import { PostCreatePage } from './pages/PostCreatePage';
+import { AppNavigation } from './features/auth/components/AppNavigation';
 import './App.css'
 
-// 상세 페이지와 작성 미리보기에서 Markdown/하이라이트 청크를 필요할 때 불러온다.
+// 상세 페이지의 Markdown/하이라이트 청크를 필요할 때 불러온다.
 const PostDetailPage = lazy(() =>
   import('./pages/PostDetailPage').then((module) => ({ default: module.PostDetailPage })),
 );
@@ -25,11 +25,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <nav className="app-nav" aria-label="주요 메뉴">
-        <NavLink to="/posts" end>게시글 목록</NavLink>
-        <NavLink to="/posts/create">글쓰기</NavLink>
-        <NavLink to="/login">로그인</NavLink>
-      </nav>
+      <AppNavigation />
       <Routes>
 
         <Route

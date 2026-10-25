@@ -42,7 +42,7 @@ const CodeBlock = ({ children, node, ...props }: ComponentProps<'pre'> & ExtraPr
 const markdownComponents = { pre: CodeBlock };
 
 /*
- * 상세 화면과 작성 미리보기에서 동일한 Markdown 문자열을 표시한다.
+ * 저장된 Markdown 문자열을 상세 화면에 표시한다. 시각적 편집기의 저장 결과도 여기서 읽는다.
  * 원시 HTML을 실행하는 플러그인이나 기본 URL 검사를 우회하는 설정을 추가하지 않는다.
  * 하이라이트는 표시 전용이며 코드를 실행하지 않는다. 언어 미지정 코드의 자동 감지도 켜지 않는다.
  */

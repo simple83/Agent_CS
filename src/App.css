@@ -8,23 +8,41 @@
   border-bottom: 1px solid var(--border);
 }
 
-.app-nav a {
+.app-nav a, .app-nav button {
   padding: 8px 12px;
   border-radius: 6px;
   color: var(--text-h);
   text-decoration: none;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 
 .app-nav a:hover,
+.app-nav button:hover,
 .app-nav a[aria-current="page"] {
   color: var(--accent);
   background: var(--accent-bg);
 }
 
 .app-nav a:focus-visible,
+.app-nav button:focus-visible,
 .post-card:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+/* 로그아웃 처리 중 중복 클릭을 막고, 실패 안내는 이동 메뉴 아래에 표시한다. */
+.app-nav button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.app-auth-error {
+  color: #c83a3a;
+  text-align: center;
+  padding: 0 16px;
 }
 
 /* 아래는 Vite 시작 화면의 기존 스타일이다. 현재 App에서는 사용하지 않으며 기능 코드와 구분해 남겨둔다. */

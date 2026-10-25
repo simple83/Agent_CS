@@ -1,132 +1,167 @@
-import { lazy, Suspense, useRef, useState } from 'react';
-import { CODE_LANGUAGES, codeFence, inlineCode, insertBlock } from '../utils/postEditor';
-
-// 무거운 Markdown/하이라이트 청크는 미리보기를 처음 열 때 로드한다.
-// 컴포넌트 바깥에서 선언해야 입력할 때마다 컴포넌트가 새로 만들어지지 않는다.
-const Preview = lazy(() => import('./PostContent').then((module) => ({ default: module.PostContent })));
+import { useEffect, useRef, useState } from 'react';
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
+import { PostEditorDisabledContext } from './PostEditorContext';
+import { createVisualEditorExtensions, isWebLink, serializeVisualEditor } from '../utils/visualEditor';
+import 'highlight.js/styles/github-dark.css';
+import './PostContent.css';
+import './PostEditor.css';
 
 interface PostEditorProps {
-  /** API에 저장될 Markdown 원문. 본문 상태의 소유자는 부모 폼이다. */
+  /** 부모는 API에 전송할 Markdown을 보관하고 편집기는 구조화된 문서를 관리한다. */
   content: string;
   onChange: (content: string) => void;
   disabled: boolean;
-  /** 아직 본문에 넣지 않은 코드. 부모도 이 값을 알아야 누락된 상태로 등록하지 않는다. */
-  codeDraft: string;
-  onCodeDraftChange: (code: string) => void;
 }
 
 /**
- * Markdown 편집을 돕는 Boundary 계층. API나 라우팅은 직접 호출하지 않는다.
- * 본문과 코드 초안은 부모가 보관하고, 이 컴포넌트는 탭/패널/언어/선택 범위를 관리한다.
- * 코드 입력 패널의 내용은 '본문에 코드 삽입'을 눌러야 저장될 Markdown에 합쳐진다.
+ * 서식이 적용된 본문을 직접 수정하는 Boundary 컴포넌트다.
+ * 입력할 때마다 Markdown만 부모에게 전달하고 문서를 다시 만들지 않는다.
+ * 이 구분이 커서 위치, 한글 조합 입력, 실행 취소 이력을 유지하는 핵심이다.
  */
-export const PostEditor = ({ content, onChange, disabled, codeDraft, onCodeDraftChange }: PostEditorProps) => {
-  const textarea = useRef<HTMLTextAreaElement>(null);
-  // 도구 버튼에 포커스가 옮겨져도 직전 본문 선택 위치를 잃지 않도록 ref에 저장한다.
-  const selection = useRef({ start: content.length, end: content.length });
-  const [preview, setPreview] = useState(false);
-  const [showCode, setShowCode] = useState(false);
-  const [language, setLanguage] = useState('cpp');
+export const PostEditor = ({ content, onChange, disabled }: PostEditorProps) => {
+  const lastPublished = useRef(content);
+  const [showLink, setShowLink] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [message, setMessage] = useState('');
+  // 확장 설정은 최초 한 번만 만든다. 본문 입력마다 언어/문법 설정을 다시 구성하지 않는다.
+  const [extensions] = useState(createVisualEditorExtensions);
 
-  /** 제어된 textarea에 새 값이 반영된 다음 프레임에 포커스/커서를 되돌린다. */
-  const focusAt = (cursor: number) => {
-    selection.current = { start: cursor, end: cursor };
-    requestAnimationFrame(() => {
-      // 프레임 실행 전에 화면을 떠난 경우 ref가 null이므로 아무 작업도 하지 않는다.
-      textarea.current?.focus();
-      textarea.current?.setSelectionRange(cursor, cursor);
-    });
+  const editor = useEditor({
+    extensions,
+    content,
+    contentType: 'markdown',
+    editable: !disabled,
+    editorProps: {
+      attributes: {
+        class: 'post-content visual-editor-body',
+        role: 'textbox',
+        'aria-label': '게시글 내용',
+        'aria-multiline': 'true',
+        'aria-describedby': 'visual-editor-help',
+      },
+      // 파일은 기존 첨부 절차로 안내한다. 일반 텍스트와 HTML 서식은 문서 규칙으로 처리한다.
+      handlePaste: (_view, event) => {
+        if (!event.clipboardData?.files.length) return false;
+        setMessage('이미지는 아래 이미지 첨부에서 선택해 주세요.');
+        return true;
+      },
+      handleDrop: (_view, event) => {
+        if (!event.dataTransfer?.files.length) return false;
+        setMessage('이미지는 아래 이미지 첨부에서 선택해 주세요.');
+        return true;
+      },
+    },
+    onUpdate: ({ editor: current }) => {
+      const markdown = serializeVisualEditor(current);
+      lastPublished.current = markdown;
+      onChange(markdown);
+    },
+  });
+
+  // 선택 위치에 따라 공통 서식 버튼의 눌림 상태를 갱신한다. 언어는 각 코드블록이 관리한다.
+  const state = useEditorState({
+    editor,
+    selector: ({ editor: current }) => current ? {
+      bold: current.isActive('bold'),
+      italic: current.isActive('italic'),
+      code: current.isActive('code'),
+      codeBlock: current.isActive('codeBlock'),
+      bulletList: current.isActive('bulletList'),
+      orderedList: current.isActive('orderedList'),
+      blockquote: current.isActive('blockquote'),
+      link: current.isActive('link'),
+      undo: current.can().undo(),
+      redo: current.can().redo(),
+    } : null,
+  });
+
+  // 저장 중에는 본문도 읽기 전용으로 만든다. 상태 변경 자체를 본문 수정으로 알리지 않는다.
+  useEffect(() => {
+    editor?.setEditable(!disabled, false);
+  }, [editor, disabled]);
+
+  // 외부 초기화에만 문서를 교체한다. 입력에 따른 부모 렌더는 건너뛰어 조합 입력을 보존한다.
+  useEffect(() => {
+    if (!editor || content === lastPublished.current) return;
+    lastPublished.current = content;
+    editor.commands.setContent(content, { contentType: 'markdown', emitUpdate: false });
+  }, [editor, content]);
+
+  if (!editor || !state) return <p role="status">본문 편집기를 준비하고 있습니다...</p>;
+
+  /** 링크 패널로 포커스가 이동해도 선택 범위는 유지된다. 기존 링크는 수정할 수 있다. */
+  const openLink = () => {
+    setLinkUrl(editor.getAttributes('link').href ?? '');
+    setMessage('');
+    setShowLink(!showLink);
   };
 
-  /** 선택 범위를 문단 단위 블록으로 교체한다. 앞뒤 개행 규칙은 순수 함수에 위임한다. */
-  const addBlock = (block: string) => {
-    const result = insertBlock(content, selection.current.start, selection.current.end, block);
-    onChange(result.content);
-    focusAt(result.cursor);
-  };
-
-  /** 선택이 없을 때는 빈 문자열을 반환하여 각 도구가 안내 문구를 넣을 수 있게 한다. */
-  const selectedText = () => content.slice(selection.current.start, selection.current.end);
-
-  /** 문단 개행을 추가하지 않고 선택 범위를 바꾼다. inline code/굵게/링크가 공유한다. */
-  const replaceInline = (text: string) => {
-    const { start, end } = selection.current;
-    onChange(content.slice(0, start) + text + content.slice(end));
-    focusAt(start + text.length);
-  };
-
-  /** 선택 문자열을 Markdown 서식으로 감싼다. 선택이 없으면 편집 가능한 예시를 넣는다. */
-  const addInline = (before: string, fallback: string, after: string) => {
-    replaceInline(before + (selectedText() || fallback) + after);
-  };
-
-  /** 패널을 여닫되 기존 코드 초안은 유지한다. 초안이 없을 때만 선택 본문을 가져온다. */
-  const toggleCodePanel = () => {
-    if (!showCode && !codeDraft && selectedText()) onCodeDraftChange(selectedText());
-    setShowCode(!showCode);
-  };
-
-  /** 선택한 언어의 코드블록을 본문에 합친 후 임시 입력만 비운다. 언어 선택은 유지한다. */
-  const insertCode = () => {
-    addBlock(codeFence(codeDraft, language));
-    onCodeDraftChange('');
-    setShowCode(false);
+  /** 선택 문자열에 링크를 적용한다. 선택이 없으면 주소 자체를 표시할 텍스트로 넣는다. */
+  const applyLink = () => {
+    const input = linkUrl.trim();
+    if (!isWebLink(input)) {
+      setMessage('http:// 또는 https://로 시작하는 올바른 웹 주소를 입력해 주세요.');
+      return;
+    }
+    // 공백/한글이 포함된 경로를 URL 표준 표현으로 바꿔 Markdown 링크도 정상 해석되게 한다.
+    const href = new URL(input).href;
+    const chain = editor.chain().focus().extendMarkRange('link');
+    if (editor.state.selection.empty && !editor.isActive('link')) {
+      chain.insertContent({ type: 'text', text: href, marks: [{ type: 'link', attrs: { href } }] }).run();
+    } else {
+      chain.setLink({ href }).run();
+    }
+    setShowLink(false);
+    setMessage('');
   };
 
   return (
     <section className="post-editor" aria-label="본문 편집기">
-      <div className="editor-tabs" aria-label="편집 화면 전환">
-        <button type="button" aria-pressed={!preview} onClick={() => setPreview(false)}>작성</button>
-        <button type="button" aria-pressed={preview} onClick={() => setPreview(true)}>미리보기</button>
+      {/* 모든 도구는 type=button으로 선언해 부모 폼을 제출하지 않는다. */}
+      <div className="editor-toolbar" role="group" aria-label="본문 서식 도구">
+        <button type="button" disabled={disabled || !state.undo} onClick={() => editor.chain().focus().undo().run()}>실행 취소</button>
+        <button type="button" disabled={disabled || !state.redo} onClick={() => editor.chain().focus().redo().run()}>다시 실행</button>
+        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>굵게</button>
+        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>기울임</button>
+        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.code} onClick={() => editor.chain().focus().toggleCode().run()}>인라인 코드</button>
+        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.link} aria-expanded={showLink} aria-controls="editor-link-panel" onClick={openLink}>링크</button>
+        <button type="button" disabled={disabled} aria-pressed={state.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>목록</button>
+        <button type="button" disabled={disabled} aria-pressed={state.orderedList} onClick={() => editor.chain().focus().toggleOrderedList().run()}>번호 목록</button>
+        <button type="button" disabled={disabled} aria-pressed={state.blockquote} onClick={() => editor.chain().focus().toggleBlockquote().run()}>인용</button>
+        <button type="button" disabled={disabled} aria-pressed={state.codeBlock} onClick={() => editor.chain().focus().toggleCodeBlock({ language: 'text' }).run()}>코드블록</button>
+        {state.codeBlock && <button type="button" disabled={disabled} onClick={() => editor.chain().focus().exitCode().run()}>코드 아래에 문단 추가</button>}
       </div>
-      {!preview && <>
-        {/* 모든 보조 도구는 type=button으로 지정해 부모 form을 뜻하지 않게 제출하지 않는다. */}
-        <div className="editor-toolbar" role="group" aria-label="본문 삽입 도구">
-          <button type="button" disabled={disabled} onClick={toggleCodePanel}
-            aria-expanded={showCode} aria-controls="code-insert-panel">{'</> 코드'}</button>
-          <button type="button" disabled={disabled} onClick={() => addInline('**', '강조할 내용', '**')}>굵게</button>
-          <button type="button" disabled={disabled} onClick={() => replaceInline(inlineCode(selectedText() || '코드'))}>인라인 코드</button>
-          <button type="button" disabled={disabled} onClick={() => addInline('[', '링크 설명', '](https://example.com)')}>링크</button>
-          <button type="button" disabled={disabled} onClick={() => addBlock((selectedText() || '목록 내용').split('\n').map((line) => `- ${line}`).join('\n'))}>목록</button>
-          <button type="button" disabled={disabled} onClick={() => addBlock((selectedText() || '인용할 내용').split('\n').map((line) => `> ${line}`).join('\n'))}>인용</button>
+
+      {showLink && <fieldset id="editor-link-panel" className="editor-link-panel" disabled={disabled}>
+        <legend>링크 설정</legend>
+        <label>웹 주소
+          <input type="url" value={linkUrl} placeholder="https://example.com"
+            onChange={(event) => setLinkUrl(event.target.value)}
+            onKeyDown={(event) => {
+              // 주소 입력의 Enter가 게시글 전체를 등록하지 않도록 여기서 처리한다.
+              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                applyLink();
+              }
+            }} />
+        </label>
+        <div className="post-actions">
+          <button type="button" onClick={() => { setShowLink(false); setMessage(''); }}>닫기</button>
+          <button type="button" onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); setShowLink(false); }}>링크 제거</button>
+          <button type="button" onClick={applyLink}>적용</button>
         </div>
-        {showCode && <fieldset id="code-insert-panel" className="code-insert-panel" disabled={disabled}>
-          <legend>코드블록 삽입</legend>
-          <label>언어
-            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-              {CODE_LANGUAGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </label>
-          <label>코드 입력
-            <textarea value={codeDraft} onChange={(event) => onCodeDraftChange(event.target.value)} rows={7} spellCheck={false} />
-          </label>
-          <p className="post-help">선택한 본문을 코드블록으로 바꾸거나, 커서 위치에 추가합니다. 오류 로그는 일반 텍스트를 선택하세요.</p>
-          <div className="post-actions">
-            <button type="button" onClick={() => onCodeDraftChange('')}>입력 비우기</button>
-            <button type="button" onClick={() => setShowCode(false)}>닫기</button>
-            <button type="button" className="primary" disabled={!codeDraft.trim()} onClick={insertCode}>본문에 코드 삽입</button>
-          </div>
-        </fieldset>}
-        <label className="post-body-label" htmlFor="post-content">내용 *</label>
-        <textarea ref={textarea} id="post-content" className="post-body-input" value={content}
-          onChange={(event) => {
-            // 입력 직후의 위치도 기록해 이후 도구 클릭 시 이전 선택 범위를 쓰지 않는다.
-            selection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
-            onChange(event.target.value);
-          }}
-          onSelect={(event) => {
-            selection.current = { start: event.currentTarget.selectionStart, end: event.currentTarget.selectionEnd };
-          }}
-          disabled={disabled} rows={14} placeholder="설명을 적고, 필요한 위치에 코드블록을 추가하세요." />
-      </>}
-      {preview && <div className="editor-preview" aria-label="본문 미리보기">
-        {content.trim()
-          ? <Suspense fallback={<p>미리보기를 준비하고 있습니다...</p>}><Preview content={content} /></Suspense>
-          : <p className="post-help">작성한 내용이 여기에 표시됩니다.</p>}
-      </div>}
-      <details className="post-help">
+      </fieldset>}
+
+      {message && <p className="editor-message" role="status">{message}</p>}
+      <div className="post-body-label">내용 *</div>
+      <PostEditorDisabledContext.Provider value={disabled}>
+        <EditorContent editor={editor} />
+      </PostEditorDisabledContext.Provider>
+
+      <details className="post-help" id="visual-editor-help">
         <summary>작성 도움말</summary>
-        <p>본문은 Markdown으로 저장됩니다. 버튼으로 서식을 넣거나 직접 작성할 수 있습니다. 코드블록마다 다른 언어를 지정할 수 있으며, 삽입 후 첫 줄의 언어 이름을 수정할 수 있습니다. 미리보기는 상세 화면과 같은 방식으로 표시됩니다.</p>
+        <p>내용을 바로 입력하고 선택한 글자에 서식을 적용하세요. 각 코드블록 상단 바의 오른쪽에서 언어를 선택합니다. 코드 안에 커서를 둔 뒤 코드 아래에 문단 추가 버튼으로 설명을 이어 쓸 수 있습니다.</p>
+        <p>Enter는 새 문단, Shift+Enter는 줄바꿈입니다. 코드 안에서는 Enter로 코드 줄을 바꿉니다. 실행 취소는 Ctrl+Z(맥은 ⌘Z)로도 가능합니다.</p>
         <p>이미지는 아래 첨부 영역에서 선택합니다. 첨부 이미지는 등록 후 본문 위에 표시됩니다.</p>
       </details>
     </section>
