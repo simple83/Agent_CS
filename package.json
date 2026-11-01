@@ -14,6 +14,7 @@
     "test:editor": "node --test tests/post-editor.test.mjs tests/visual-editor.test.mjs",
     "test:likes": "node --test tests/post-likes.test.mjs",
     "test:auth": "node --test tests/auth-navigation.test.mjs",
+    "test:management": "node --test tests/post-management.test.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "preview:mock": "vite preview --outDir dist-mock"

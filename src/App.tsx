@@ -9,6 +9,7 @@ import {
 import { LoginPage } from './pages/LoginPage'
 import { PostListPage } from './pages/PostListPage';
 import { PostCreatePage } from './pages/PostCreatePage';
+import { PostEditPage } from './pages/PostEditPage';
 import { AppNavigation } from './features/auth/components/AppNavigation';
 
 // 상세 페이지의 Markdown/하이라이트 청크를 필요할 때 불러온다.
@@ -45,6 +46,11 @@ function App() {
         <Route
           path="/posts/create"
           element={<PostCreatePage />}
+        />
+
+        <Route
+          path="/posts/:postId/edit"
+          element={<PostEditPage />}
         />
 
         <Route

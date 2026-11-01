@@ -12,6 +12,8 @@ interface PostEditorProps {
   content: string;
   onChange: (content: string) => void;
   disabled: boolean;
+  /** 수정 화면은 기존 첨부를 유지하므로 붙여넣기 안내에서 파일 선택을 권하지 않는다. */
+  imageAttachmentAvailable?: boolean;
 }
 
 /**
@@ -19,7 +21,7 @@ interface PostEditorProps {
  * 입력할 때마다 Markdown만 부모에게 전달하고 문서를 다시 만들지 않는다.
  * 이 구분이 커서 위치, 한글 조합 입력, 실행 취소 이력을 유지하는 핵심이다.
  */
-export const PostEditor = ({ content, onChange, disabled }: PostEditorProps) => {
+export const PostEditor = ({ content, onChange, disabled, imageAttachmentAvailable = true }: PostEditorProps) => {
   const lastPublished = useRef(content);
   const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
@@ -43,12 +45,12 @@ export const PostEditor = ({ content, onChange, disabled }: PostEditorProps) => 
       // 파일은 기존 첨부 절차로 안내한다. 일반 텍스트와 HTML 서식은 문서 규칙으로 처리한다.
       handlePaste: (_view, event) => {
         if (!event.clipboardData?.files.length) return false;
-        setMessage('이미지는 아래 이미지 첨부에서 선택해 주세요.');
+        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '수정 화면에서는 기존 이미지를 유지하며 이미지 추가·교체를 지원하지 않습니다.');
         return true;
       },
       handleDrop: (_view, event) => {
         if (!event.dataTransfer?.files.length) return false;
-        setMessage('이미지는 아래 이미지 첨부에서 선택해 주세요.');
+        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '수정 화면에서는 기존 이미지를 유지하며 이미지 추가·교체를 지원하지 않습니다.');
         return true;
       },
     },

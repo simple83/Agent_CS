@@ -43,6 +43,18 @@ Currently, two official plugins are available:
 
 편집 기능 회귀 검증: `npm run test:editor` (말머리, 시각적 문서의 Markdown 저장/복원, 코드 공백·백틱, 언어 변경·실행 취소, 안전한 HTML 처리, 등록 실패와 재시도).
 
+## 내 게시글 수정·삭제
+
+- 상세 화면 오른쪽 위의 수정·삭제 버튼은 현재 로그인한 작성자에게만 보입니다. 최종 권한 검사는 Mock/실제 서버 API가 담당합니다.
+- `/posts/:postId/edit`에서 원본을 조회한 뒤 기존 작성 폼과 시각적 편집기를 재사용합니다. 새로고침과 직접 진입을 지원하고, 비로그인·타인 게시글은 편집을 막습니다.
+- 저장 실패 시 현재 입력을 보존하고 요청 중에는 중복 저장을 막습니다. 성공하면 상세로 돌아가며, 취소는 저장하지 않고 돌아갑니다. 다른 화면으로 이동한 뒤의 임시 저장은 지원하지 않습니다.
+- 수정하지 않은 태그는 PATCH에서 생략합니다. 말머리를 직접 변경하면 기존 말머리 태그들을 선택한 하나로 정리하고 나머지 주제 태그는 유지합니다.
+- 수정 화면의 이미지는 읽기 전용입니다. 이미지 교체·삭제 규칙이 확정될 때까지 PATCH의 `images`를 생략해 기존 첨부를 유지합니다. 새 글의 이미지 첨부는 기존대로 동작합니다.
+- 삭제는 확인창에서 확인한 뒤 요청합니다. 성공하면 목록으로 이동하고 실패하면 상세에 오류를 표시합니다. API는 소프트 삭제이며 복원 UI는 없습니다.
+- 수정 화면도 기존 상세 조회 API를 사용하므로 진입 시 조회수가 증가할 수 있습니다. 조회수 집계 정책은 별도 작업으로 보류했습니다.
+
+회귀 검사: `npm run test:management` (Mock 기반 수정·삭제, 직접 진입, 계정 변경, 원본 보존, 실패·중복 요청).
+
 ## 게시글 기능 파일 위치
 
 화면을 수정할 때는 아래 역할별 폴더에서 시작합니다. 전용 CSS는 사용하는 컴포넌트 옆에 둡니다.
@@ -51,12 +63,12 @@ Currently, two official plugins are available:
 src/features/post/
 ├─ components/
 │  ├─ list/          # PostList, PostCard: 목록과 요약 카드
-│  ├─ write/         # PostForm: 제목·첨부·태그·등록
+│  ├─ write/         # PostForm, PostEdit: 작성·수정 폼과 수정 권한 확인
 │  │  └─ editor/     # PostEditor, CodeBlockEditor, Context, 편집기 설정·Markdown 변환
-│  ├─ detail/        # PostDetail, PostLikeControl: 상세 화면과 좋아요
+│  ├─ detail/        # PostDetail, PostLikeControl, PostOwnerActions: 상세·좋아요·작성자 도구
 │  └─ content/       # PostContent와 작성·상세가 공유하는 본문·코드 스타일
 ├─ styles/           # PostLayout: 목록·작성 화면 공통 배치
-├─ hooks/            # 조회·작성·좋아요 상태와 처리 흐름
+├─ hooks/            # 조회·작성·수정·삭제·좋아요 상태와 처리 흐름
 ├─ services/         # Mock/Real API
 ├─ types/            # 게시글과 API 데이터 타입
 ├─ utils/            # 말머리·언어 목록 등 공통 보조 함수

@@ -1,16 +1,22 @@
 import { usePostDetail } from '../../hooks/usePostDetail';
 import { PostContent } from '../content/PostContent';
 import { PostLikeControl } from './PostLikeControl';
+import { PostOwnerActions } from './PostOwnerActions';
+import { useAuthUserId } from '../../../auth/hooks/useAuthSession';
 import { getPostCategory } from '../../utils/postEditor';
 import styles from './PostDetail.module.css';
 import ui from '../../../../shared/styles/Controls.module.css';
 
 interface PostDetailProps {
   postId: number;
+  /** 화면 이동은 Page에 위임한다. 콜백 없는 읽기 전용 상세에는 관리 도구를 표시하지 않는다. */
+  onEdit?: () => void;
+  onDeleted?: () => void | Promise<void>;
 }
 
 /** 상세 조회 상태를 먼저 분기한 뒤 본문과 태그를 표시한다. 좋아요 변경 도구는 이 상세 화면에만 둔다. */
-export const PostDetail = ({ postId }: PostDetailProps) => {
+export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
+  const userId = useAuthUserId();
   const {
     post,
     isLoading,
@@ -32,7 +38,13 @@ export const PostDetail = ({ postId }: PostDetailProps) => {
   return (
     <article className={styles.container}>
       <header className={styles.header}>
-        <span className={ui.badge}>{getPostCategory(post.hashtags)}</span>
+        <div className={styles.headingRow}>
+          <span className={ui.badge}>{getPostCategory(post.hashtags)}</span>
+          {/* 계정 전환 때 관리 상태도 초기화한다. 실제 권한은 서버가 최종 검증한다. */}
+          {userId === post.author_id && onEdit && onDeleted && <PostOwnerActions
+            key={`${post.id}:${userId}`} postId={post.id} authorId={post.author_id}
+            onEdit={onEdit} onDeleted={onDeleted} />}
+        </div>
         <h1 className={styles.title}>{post.title}</h1>
 
         <div className={styles.author}>

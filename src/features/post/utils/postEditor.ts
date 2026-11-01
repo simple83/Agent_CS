@@ -34,6 +34,29 @@ export const getPostTags = (category: PostCategory, input: string): string[] => 
     .filter((tag) => tag && !isPostCategory(tag))),
 ];
 
+/** 수정 폼에는 대표 말머리 이외의 기존 태그를 모두 표시해 과거 태그도 직접 확인하게 한다. */
+export const getPostTopicInput = (tags: Hashtag[]): string =>
+  tags.filter((tag) => tag.name !== getPostCategory(tags)).map((tag) => tag.name).join(', ');
+
+/**
+ * 수정하지 않은 태그는 순서·공백·옛 말머리를 포함해 그대로 보존한다.
+ * 주제 입력을 바꾼 경우에만 쉼표 규칙으로 해석하며, 기존의 다른 말머리 태그도 보존한다.
+ * 단, 말머리를 명시적으로 바꾸면 예약 태그들을 선택한 하나로 정리한다. 그렇지 않으면
+ * 과거 말머리의 표시 우선순위 때문에 저장 후 사용자의 새 선택이 무시될 수 있다.
+ */
+export const getEditedPostTags = (tags: Hashtag[], category: PostCategory, input: string): string[] => {
+  const originalCategory = getPostCategory(tags);
+  const originalNames = tags.map((tag) => tag.name);
+  const unchangedInput = input === getPostTopicInput(tags);
+  if (unchangedInput && category === originalCategory) return originalNames;
+
+  const topics = unchangedInput ? originalNames.filter((name) => name !== originalCategory)
+    : input.split(',').map((tag) => tag.trim().replace(/^#+/, '').trim()).filter(Boolean);
+  const preservedTopics = topics.filter((name) => !isPostCategory(name)
+    || (category === originalCategory && originalNames.includes(name)));
+  return [...new Set([category, ...preservedTopics])];
+};
+
 /** [Markdown에 저장할 식별자, 사용자에게 보여줄 이름]. 자동 감지는 사용하지 않는다. */
 export const CODE_LANGUAGES = [
   ['text', '일반 텍스트'], ['c', 'C'], ['cpp', 'C++'], ['java', 'Java'],

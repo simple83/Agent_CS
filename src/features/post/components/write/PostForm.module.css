@@ -58,6 +58,22 @@
   gap: 6px;
 }
 
+/* 수정 화면의 읽기 전용 첨부 목록이다. 이미지 비율을 유지하고 좁은 화면에서는 줄바꿈한다. */
+.existingImages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.existingImage {
+  max-width: 100%;
+  width: 180px;
+  height: 140px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
 @media (max-width: 600px) {
   .titleRow {
     grid-template-columns: 1fr;

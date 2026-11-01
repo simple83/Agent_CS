@@ -6,9 +6,11 @@ import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 
 // 실제 컴포넌트/Hook을 실행하고 API 완료 시점만 제어해 중복 클릭과 늦은 응답을 재현한다.
-const dom = new JSDOM('<!doctype html><html><body></body></html>');
+const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
+// 상세 화면의 작성자 메뉴가 인증 저장소를 구독하므로 브라우저 저장소도 제공한다.
+globalThis.localStorage = dom.window.localStorage;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const server = await createServer({ configFile: false, mode: 'mock',
   server: { middlewareMode: true, watch: null, hmr: false, ws: false },
@@ -32,11 +34,12 @@ afterEach(async () => {
   await act(async () => { for (const root of roots) root.unmount(); });
   roots.length = 0;
   document.body.replaceChildren();
+  localStorage.clear();
   Object.assign(postApi, original);
 });
 after(async () => {
   await server.close(); dom.window.close();
-  delete globalThis.window; delete globalThis.document; delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+  delete globalThis.window; delete globalThis.document; delete globalThis.localStorage; delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
 
 /** 실제 DOM에 컴포넌트를 마운트하고 사용자 클릭/화면 내용을 검사할 수 있게 반환한다. */

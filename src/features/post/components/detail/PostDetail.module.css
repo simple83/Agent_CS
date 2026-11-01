@@ -12,6 +12,16 @@
   padding-bottom: 16px;
 }
 
+/* 말머리와 작성자 도구를 양끝에 배치한다. 좁은 화면의 오류 문구는 줄바꿈한다. */
+.headingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
 .title {
   margin: 0 0 16px;
   font-size: clamp(24px, 4vw, 36px);

@@ -216,3 +216,29 @@ test('실제 API 주소가 없으면 프론트 서버로 잘못 요청하지 않
   await assert.rejects(unconfiguredReal.postApi.getPosts(), /실제 API 주소가 없습니다/);
   await assert.rejects(unconfiguredReal.authApi.login({ account_id: 'a', password: 'b' }), /실제 API 주소가 없습니다/);
 });
+
+test('실제 수정은 이미지 없는 multipart PATCH이고 삭제는 인증된 DELETE다', async () => {
+  real.authStorage.saveLogin({ access_token: 'real-token', refresh_token: 'real-refresh',
+    user_id: 7, account_id: 'real-user', token_type: 'bearer' });
+  const calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return Response.json(options.method === 'DELETE' ? { detail: '삭제 완료' } : { id: 42 });
+  };
+  await real.postApi.updatePost(42, { title: '수정 제목', content: '```cpp\nint n;\n```' });
+  assert.equal(calls[0].url, 'https://backend.example.test/api/posts/42');
+  assert.equal(calls[0].options.method, 'PATCH');
+  assert.equal(calls[0].options.headers.Authorization, 'bearer real-token');
+  assert.equal(calls[0].options.headers['Content-Type'], undefined);
+  assert.equal(calls[0].options.body.get('title'), '수정 제목');
+  assert.equal(calls[0].options.body.has('images'), false);
+  assert.equal(calls[0].options.body.has('hashtags'), false);
+  await real.postApi.updatePost(42, { hashtags: ['코드리뷰', 'C++'] });
+  assert.equal(calls[1].options.body.get('hashtags'), '["코드리뷰","C++"]');
+  assert.deepEqual(await real.postApi.deletePost(42), { detail: '삭제 완료' });
+  assert.equal(calls[2].options.method, 'DELETE');
+  assert.equal(calls[2].options.headers.Authorization, 'bearer real-token');
+  globalThis.fetch = async () => Response.json({ detail: '본인 글만 변경할 수 있습니다.' }, { status: 403 });
+  await assert.rejects(real.postApi.updatePost(42, { title: '실패' }), /본인 글/);
+  await assert.rejects(real.postApi.deletePost(42), /본인 글/);
+});
