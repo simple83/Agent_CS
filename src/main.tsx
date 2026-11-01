@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import layout from './App.module.css'
 import App from './App.tsx'
 
 /**
@@ -14,8 +15,10 @@ async function bootstrap() {
 
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      {MockToolbar && <MockToolbar />}
-      <App />
+      <div className={layout.shell}>
+        {MockToolbar && <MockToolbar />}
+        <App />
+      </div>
     </StrictMode>,
   );
 }

@@ -1,3 +1,4 @@
+import styles from './MockToolbar.module.css';
 import { useState } from 'react';
 import { authApi } from '../../features/auth/services/authApi';
 import { authStorage } from '../services/authStorage';
@@ -18,16 +19,16 @@ export const MockToolbar = () => {
     }
   };
   return (
-    <aside aria-label="Mock 테스트 도구" style={{ padding: 12, background: '#fff3cd', color: '#332701', textAlign: 'left', fontSize: 14 }}>
+    <aside aria-label="Mock 테스트 도구" className={styles.toolbar}>
       <strong>MOCK 모드 · 백엔드 연결 없음</strong>
       <p>테스트 계정: jinwoo99 또는 dev_hero / 비밀번호: mock1234</p>
-      <nav aria-label="Mock 테스트 화면 이동" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '8px 0' }}>
+      <nav aria-label="Mock 테스트 화면 이동" className={styles.nav}>
         <a href="/login">로그인</a>
         <a href="/posts">목록</a>
         <a href="/posts/create">글쓰기</a>
         <a href="/posts/2">코드블록 예제</a>
       </nav>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className={styles.actions}>
         <button type="button" onClick={() => void logout()}>Mock 로그아웃</button>
         {/* 실패 예약은 지금 요청하지 않고 다음 API 호출에서 한 번 소비된다. */}
         <button type="button" onClick={() => {

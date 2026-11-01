@@ -1,0 +1,30 @@
+/* Mock 도구는 제품의 테마와 분리된 밝은 안내 영역으로 표시한다. */
+.toolbar {
+  padding: 12px;
+  background: #fff3cd;
+  color: #332701;
+  color-scheme: light;
+  text-align: left;
+  font-size: 14px;
+}
+
+.toolbar p {
+  margin: 8px 0;
+}
+
+.toolbar a {
+  color: #49368b;
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

@@ -15,8 +15,8 @@ const server = await createServer({ configFile: false, mode: 'mock',
   optimizeDeps: { noDiscovery: true, include: [] } });
 const { postApi } = await server.ssrLoadModule('/src/features/post/services/postApi.ts');
 const { usePostLike } = await server.ssrLoadModule('/src/features/post/hooks/usePostLike.ts');
-const { PostCard } = await server.ssrLoadModule('/src/features/post/components/PostCard.tsx');
-const { PostDetail } = await server.ssrLoadModule('/src/features/post/components/PostDetail.tsx');
+const { PostCard } = await server.ssrLoadModule('/src/features/post/components/list/PostCard.tsx');
+const { PostDetail } = await server.ssrLoadModule('/src/features/post/components/detail/PostDetail.tsx');
 const { MOCK_POSTS } = await server.ssrLoadModule('/src/features/post/mocks/mockPosts.ts');
 const original = { ...postApi };
 const roots = [];

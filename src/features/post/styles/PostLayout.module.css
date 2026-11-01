@@ -1,0 +1,33 @@
+/* 목록과 작성 화면에서 명시적으로 공유하는 폭과 머리말이다. 본문에는 적용하지 않는다. */
+.page {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--text-h);
+}
+
+.heading {
+  border-bottom: 2px solid var(--primary);
+  padding-bottom: 16px;
+}
+
+.heading h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.heading p {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 16px 12px;
+  }
+}

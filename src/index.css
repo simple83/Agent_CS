@@ -1,116 +1,29 @@
-/* 전역 색상/글꼴 토큰. 게시판과 편집기는 이 변수를 공유해 운영체제 테마에 맞춰 표시한다. */
+@import './styles/tokens.css';
+
+/* 전역에는 기본값만 둔다. 제목·코드·정렬은 각 컴포넌트가 결정한다.
+   단위 없는 줄 높이는 자식 글자 크기에 맞춰 계산되며 글꼴 합성을 막지 않는다. */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
+  font-family: var(--sans);
+  font-size: 18px;
+  line-height: 1.45;
   color: var(--text);
   background: var(--bg);
-  font-synthesis: none;
+  color-scheme: light dark;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-/* 다크 모드에서는 토큰만 교체한다. 고정 색상을 쓰는 개별 컴포넌트에는 자동 적용되지 않는다. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-/* 앱 전체의 최대 폭과 최소 높이. box-sizing으로 테두리를 포함해 작은 화면의 넘침을 줄인다. */
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+/* 폭 계산만 통일하고 요소의 디자인은 지정하지 않는다. */
+*, *::before, *::after {
   box-sizing: border-box;
 }
-
 body {
   margin: 0;
 }
 
-/* 공통 제목/문단 기본값. 게시글 상세 제목은 여러 줄 겹침 방지를 위해 자체 줄 높이를 지정한다. */
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+@media (max-width: 1024px) {
+  :root {
+    font-size: 16px;
   }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-/* 일반 인라인 코드 기본값. Markdown 코드 블록에서는 PostContent.css가 필요한 속성을 덮어쓴다. */
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }

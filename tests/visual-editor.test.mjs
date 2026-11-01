@@ -19,11 +19,11 @@ const server = await createServer({
   optimizeDeps: { noDiscovery: true, include: [] },
 });
 const { createVisualEditorExtensions, serializeVisualEditor, isWebLink } =
-  await server.ssrLoadModule('/src/features/post/utils/visualEditor.ts');
-const { PostContent } = await server.ssrLoadModule('/src/features/post/components/PostContent.tsx');
+  await server.ssrLoadModule('/src/features/post/components/write/editor/visualEditor.ts');
+const { PostContent } = await server.ssrLoadModule('/src/features/post/components/content/PostContent.tsx');
 const editors = [];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-const { PostEditorDisabledContext } = await server.ssrLoadModule('/src/features/post/components/PostEditorContext.ts');
+const { PostEditorDisabledContext } = await server.ssrLoadModule('/src/features/post/components/write/editor/PostEditorContext.ts');
 
 /** 각 사례마다 문서/실행 취소 이력이 독립된 편집기를 만든다. */
 function makeEditor(content = '') {
@@ -117,7 +117,7 @@ test('블록별 언어 메뉴는 커서와 무관하게 해당 블록만 바꾸�
     });
     assert.equal(editor.state.doc.firstChild.attrs.language, 'javascript');
     assert.equal(menus[1].value, 'python');
-    assert.ok(container.querySelector('.editor-code-block [class^=hljs-]'));
+    assert.ok(container.querySelector('pre code [class^=hljs-]'));
     assert.ok(serializeVisualEditor(editor).includes('```javascript'));
     assert.ok(!serializeVisualEditor(editor).includes('코드블록'));
     await act(async () => editor.commands.undo());

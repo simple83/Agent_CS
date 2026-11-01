@@ -1,6 +1,7 @@
+import styles from '../../content/CodeBlock.module.css';
 import { useContext, type ChangeEvent } from 'react';
 import { NodeViewContent, NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
-import { CODE_LANGUAGES } from '../utils/postEditor';
+import { CODE_LANGUAGES } from '../../../utils/postEditor';
 import { PostEditorDisabledContext } from './PostEditorContext';
 
 /**
@@ -22,11 +23,11 @@ export const CodeBlockEditor = ({ node, updateAttributes, editor }: NodeViewProp
   };
 
   return (
-    <NodeViewWrapper className="editor-code-block">
-      <div className="editor-code-bar" contentEditable={false}>
+    <NodeViewWrapper className={styles.block}>
+      <div className={styles.bar} contentEditable={false}>
         <span>코드블록</span>
-        <label className="editor-code-language">언어
-          <select aria-label="코드블록 언어" value={language} disabled={disabled}
+        <label className={styles.language}>언어
+          <select className={styles.control} aria-label="코드블록 언어" value={language} disabled={disabled}
             onChange={changeLanguage}>
             {/* 붙여넣은 기존 코드에 다른 언어 이름이 있어도 선택 메뉴가 빈 값으로 보이지 않게 한다. */}
             {!knownLanguage && <option value={language}>{language}</option>}
@@ -35,7 +36,8 @@ export const CodeBlockEditor = ({ node, updateAttributes, editor }: NodeViewProp
         </label>
       </div>
 
-      {/* NodeViewContent만 문서에 연결하므로 언어 메뉴의 문구는 Markdown 본문에 저장되지 않는다. */}
+      {/* NodeViewContent만 문서에 연결하므로 언어 메뉴 문구는 본문에 저장되지 않는다.
+          라이브러리가 기본으로 넣는 인라인 pre-wrap을 pre로 바꿔 긴 코드 줄을 보존한다. */}
       <pre><NodeViewContent<'code'> as="code" className={`language-${language}`} style={{ whiteSpace: 'pre' }} /></pre>
     </NodeViewWrapper>
   );

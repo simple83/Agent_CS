@@ -1,0 +1,158 @@
+/*!
+BSD 3-Clause License
+
+Copyright (c) 2006, Ivan Sagalaev.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of the copyright holder nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+/* highlight.js GitHub Dark 색상을 본문 루트 안에만 적용한다. 라이브러리 갱신 시 이 범위도 검토한다. */
+/*!
+  Theme: GitHub Dark
+  Description: Dark theme as seen on github.com
+  Author: github.com
+  Maintainer: @Hirse
+  Updated: 2021-05-15
+
+  Outdated base version: https://github.com/primer/github-syntax-dark
+  Current colors taken from GitHub's CSS
+*/
+.syntax :global(.hljs) {
+  /* 상세 렌더러에만 붙는 hljs 루트도 편집기의 기본 코드 색상과 일치시킨다. */
+  color: var(--syntax-text);
+  background: var(--syntax-bg)
+}
+
+.syntax :global(.hljs-doctag),
+.syntax :global(.hljs-keyword),
+.syntax :global(.hljs-meta .hljs-keyword),
+.syntax :global(.hljs-template-tag),
+.syntax :global(.hljs-template-variable),
+.syntax :global(.hljs-type),
+.syntax :global(.hljs-variable.language_) {
+  /* prettylights-syntax-keyword */
+  color: #ff7b72
+}
+
+.syntax :global(.hljs-title),
+.syntax :global(.hljs-title.class_),
+.syntax :global(.hljs-title.class_.inherited__),
+.syntax :global(.hljs-title.function_) {
+  /* prettylights-syntax-entity */
+  color: #d2a8ff
+}
+
+.syntax :global(.hljs-attr),
+.syntax :global(.hljs-attribute),
+.syntax :global(.hljs-literal),
+.syntax :global(.hljs-meta),
+.syntax :global(.hljs-number),
+.syntax :global(.hljs-operator),
+.syntax :global(.hljs-variable),
+.syntax :global(.hljs-selector-attr),
+.syntax :global(.hljs-selector-class),
+.syntax :global(.hljs-selector-id) {
+  /* prettylights-syntax-constant */
+  color: #79c0ff
+}
+
+.syntax :global(.hljs-regexp),
+.syntax :global(.hljs-string),
+.syntax :global(.hljs-meta .hljs-string) {
+  /* prettylights-syntax-string */
+  color: #a5d6ff
+}
+
+.syntax :global(.hljs-built_in),
+.syntax :global(.hljs-symbol) {
+  /* prettylights-syntax-variable */
+  color: #ffa657
+}
+
+.syntax :global(.hljs-comment),
+.syntax :global(.hljs-code),
+.syntax :global(.hljs-formula) {
+  /* prettylights-syntax-comment */
+  color: #8b949e
+}
+
+.syntax :global(.hljs-name),
+.syntax :global(.hljs-quote),
+.syntax :global(.hljs-selector-tag),
+.syntax :global(.hljs-selector-pseudo) {
+  /* prettylights-syntax-entity-tag */
+  color: #7ee787
+}
+
+.syntax :global(.hljs-subst) {
+  /* prettylights-syntax-storage-modifier-import */
+  color: #c9d1d9
+}
+
+.syntax :global(.hljs-section) {
+  /* prettylights-syntax-markup-heading */
+  color: #1f6feb;
+  font-weight: bold
+}
+
+.syntax :global(.hljs-bullet) {
+  /* prettylights-syntax-markup-list */
+  color: #f2cc60
+}
+
+.syntax :global(.hljs-emphasis) {
+  /* prettylights-syntax-markup-italic */
+  color: #c9d1d9;
+  font-style: italic
+}
+
+.syntax :global(.hljs-strong) {
+  /* prettylights-syntax-markup-bold */
+  color: #c9d1d9;
+  font-weight: bold
+}
+
+.syntax :global(.hljs-addition) {
+  /* prettylights-syntax-markup-inserted */
+  color: #aff5b4;
+  background-color: #033a16
+}
+
+.syntax :global(.hljs-deletion) {
+  /* prettylights-syntax-markup-deleted */
+  color: #ffdcd7;
+  background-color: #67060c
+}
+
+.syntax :global(.hljs-char.escape_),
+.syntax :global(.hljs-link),
+.syntax :global(.hljs-params),
+.syntax :global(.hljs-property),
+.syntax :global(.hljs-punctuation),
+.syntax :global(.hljs-tag) {
+  /* purposely ignored */
+
+}

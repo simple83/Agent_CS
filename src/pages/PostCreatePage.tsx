@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router';
-import { PostForm } from '../features/post/components/PostForm';
+import { PostForm } from '../features/post/components/write/PostForm';
 import type { PostEntity } from '../features/post/types/post.types';
 import { isPostCategory } from '../features/post/utils/postEditor';
 

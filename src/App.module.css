@@ -1,0 +1,10 @@
+/* 앱 바깥 틀만 담당한다. 자식의 텍스트 정렬이나 요소 모양은 변경하지 않는다. */
+.shell {
+  width: 100%;
+  max-width: 1126px;
+  min-height: 100svh;
+  margin: 0 auto;
+  border-inline: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}

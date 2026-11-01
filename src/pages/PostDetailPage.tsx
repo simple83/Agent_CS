@@ -1,5 +1,5 @@
 import { useParams } from 'react-router';
-import { PostDetail } from '../features/post/components/PostDetail';
+import { PostDetail } from '../features/post/components/detail/PostDetail';
 
 /** URL의 글 번호를 검증한 뒤 상세 컴포넌트에 전달한다. 잘못된 번호로 API를 호출하지 않는다. */
 export const PostDetailPage = () => {

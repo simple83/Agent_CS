@@ -4,9 +4,9 @@ import { Markdown } from '@tiptap/markdown';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { MarkdownSerializer, defaultMarkdownSerializer } from 'prosemirror-markdown';
 import { common, createLowlight } from 'lowlight';
-import { codeFence, inlineCode } from './postEditor';
+import { codeFence, inlineCode } from '../../../utils/postEditor';
 import { ReactNodeViewRenderer } from '@tiptap/react';
-import { CodeBlockEditor } from '../components/CodeBlockEditor';
+import { CodeBlockEditor } from './CodeBlockEditor';
 
 // 상세 화면과 같은 언어 해석기를 사용한다. JSX/TSX는 각각 JS/TS 문법으로 표시한다.
 const lowlight = createLowlight(common);

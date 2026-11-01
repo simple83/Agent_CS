@@ -1,0 +1,65 @@
+/* 폼은 필드와 편집기의 배치만 관리하며 자식 편집기 안의 요소는 선택하지 않는다. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.titleRow {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+}
+
+/* 긴 파일명은 줄바꿈하고 제거 버튼의 위치를 유지한다. */
+.attachments {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.fileInput {
+  max-width: 100%;
+  min-width: 0;
+  color: var(--text-h);
+}
+
+.fileInput:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.attachmentList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.attachmentList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  font-size: 13px;
+}
+
+.attachmentList span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .titleRow {
+    grid-template-columns: 1fr;
+  }
+}

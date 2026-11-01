@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { PostEditorDisabledContext } from './PostEditorContext';
-import { createVisualEditorExtensions, isWebLink, serializeVisualEditor } from '../utils/visualEditor';
-import 'highlight.js/styles/github-dark.css';
-import './PostContent.css';
-import './PostEditor.css';
+import { createVisualEditorExtensions, isWebLink, serializeVisualEditor } from './visualEditor';
+import styles from './PostEditor.module.css';
+import richText from '../../content/RichText.module.css';
+import syntax from '../../content/CodeSyntax.module.css';
+import ui from '../../../../../shared/styles/Controls.module.css';
 
 interface PostEditorProps {
   /** 부모는 API에 전송할 Markdown을 보관하고 편집기는 구조화된 문서를 관리한다. */
@@ -33,7 +34,7 @@ export const PostEditor = ({ content, onChange, disabled }: PostEditorProps) => 
     editable: !disabled,
     editorProps: {
       attributes: {
-        class: 'post-content visual-editor-body',
+        class: `${richText.body} ${syntax.syntax} ${styles.body}`,
         role: 'textbox',
         'aria-label': '게시글 내용',
         'aria-multiline': 'true',
@@ -116,26 +117,26 @@ export const PostEditor = ({ content, onChange, disabled }: PostEditorProps) => 
   };
 
   return (
-    <section className="post-editor" aria-label="본문 편집기">
+    <section className={styles.editor} aria-label="본문 편집기">
       {/* 모든 도구는 type=button으로 선언해 부모 폼을 제출하지 않는다. */}
-      <div className="editor-toolbar" role="group" aria-label="본문 서식 도구">
-        <button type="button" disabled={disabled || !state.undo} onClick={() => editor.chain().focus().undo().run()}>실행 취소</button>
-        <button type="button" disabled={disabled || !state.redo} onClick={() => editor.chain().focus().redo().run()}>다시 실행</button>
-        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>굵게</button>
-        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>기울임</button>
-        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.code} onClick={() => editor.chain().focus().toggleCode().run()}>인라인 코드</button>
-        <button type="button" disabled={disabled || state.codeBlock} aria-pressed={state.link} aria-expanded={showLink} aria-controls="editor-link-panel" onClick={openLink}>링크</button>
-        <button type="button" disabled={disabled} aria-pressed={state.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>목록</button>
-        <button type="button" disabled={disabled} aria-pressed={state.orderedList} onClick={() => editor.chain().focus().toggleOrderedList().run()}>번호 목록</button>
-        <button type="button" disabled={disabled} aria-pressed={state.blockquote} onClick={() => editor.chain().focus().toggleBlockquote().run()}>인용</button>
-        <button type="button" disabled={disabled} aria-pressed={state.codeBlock} onClick={() => editor.chain().focus().toggleCodeBlock({ language: 'text' }).run()}>코드블록</button>
-        {state.codeBlock && <button type="button" disabled={disabled} onClick={() => editor.chain().focus().exitCode().run()}>코드 아래에 문단 추가</button>}
+      <div className={styles.toolbar} role="group" aria-label="본문 서식 도구">
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || !state.undo} onClick={() => editor.chain().focus().undo().run()}>실행 취소</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || !state.redo} onClick={() => editor.chain().focus().redo().run()}>다시 실행</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>굵게</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>기울임</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.code} onClick={() => editor.chain().focus().toggleCode().run()}>인라인 코드</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.link} aria-expanded={showLink} aria-controls="editor-link-panel" onClick={openLink}>링크</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>목록</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.orderedList} onClick={() => editor.chain().focus().toggleOrderedList().run()}>번호 목록</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.blockquote} onClick={() => editor.chain().focus().toggleBlockquote().run()}>인용</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.codeBlock} onClick={() => editor.chain().focus().toggleCodeBlock({ language: 'text' }).run()}>코드블록</button>
+        {state.codeBlock && <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} onClick={() => editor.chain().focus().exitCode().run()}>코드 아래에 문단 추가</button>}
       </div>
 
-      {showLink && <fieldset id="editor-link-panel" className="editor-link-panel" disabled={disabled}>
+      {showLink && <fieldset id="editor-link-panel" className={styles.linkPanel} disabled={disabled}>
         <legend>링크 설정</legend>
-        <label>웹 주소
-          <input type="url" value={linkUrl} placeholder="https://example.com"
+        <label className={ui.field}>웹 주소
+          <input className={ui.input} type="url" value={linkUrl} placeholder="https://example.com"
             onChange={(event) => setLinkUrl(event.target.value)}
             onKeyDown={(event) => {
               // 주소 입력의 Enter가 게시글 전체를 등록하지 않도록 여기서 처리한다.
@@ -145,25 +146,18 @@ export const PostEditor = ({ content, onChange, disabled }: PostEditorProps) => 
               }
             }} />
         </label>
-        <div className="post-actions">
-          <button type="button" onClick={() => { setShowLink(false); setMessage(''); }}>닫기</button>
-          <button type="button" onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); setShowLink(false); }}>링크 제거</button>
-          <button type="button" onClick={applyLink}>적용</button>
+        <div className={`${ui.actions} ${styles.linkActions}`}>
+          <button className={`${ui.button} ${styles.toolButton}`} type="button" onClick={() => { setShowLink(false); setMessage(''); }}>닫기</button>
+          <button className={`${ui.button} ${styles.toolButton}`} type="button" onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); setShowLink(false); }}>링크 제거</button>
+          <button className={`${ui.button} ${styles.toolButton}`} type="button" onClick={applyLink}>적용</button>
         </div>
       </fieldset>}
 
-      {message && <p className="editor-message" role="status">{message}</p>}
-      <div className="post-body-label">내용 *</div>
+      {message && <p className={styles.message} role="status">{message}</p>}
+      <div className={styles.label}>내용 *</div>
       <PostEditorDisabledContext.Provider value={disabled}>
         <EditorContent editor={editor} />
       </PostEditorDisabledContext.Provider>
-
-      <details className="post-help" id="visual-editor-help">
-        <summary>작성 도움말</summary>
-        <p>내용을 바로 입력하고 선택한 글자에 서식을 적용하세요. 각 코드블록 상단 바의 오른쪽에서 언어를 선택합니다. 코드 안에 커서를 둔 뒤 코드 아래에 문단 추가 버튼으로 설명을 이어 쓸 수 있습니다.</p>
-        <p>Enter는 새 문단, Shift+Enter는 줄바꿈입니다. 코드 안에서는 Enter로 코드 줄을 바꿉니다. 실행 취소는 Ctrl+Z(맥은 ⌘Z)로도 가능합니다.</p>
-        <p>이미지는 아래 첨부 영역에서 선택합니다. 첨부 이미지는 등록 후 본문 위에 표시됩니다.</p>
-      </details>
     </section>
   );
 };

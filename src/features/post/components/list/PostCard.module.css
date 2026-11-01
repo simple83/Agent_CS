@@ -1,0 +1,131 @@
+/* 재사용 카드의 배치와 포커스 표시를 카드가 직접 소유한다. */
+
+.cardContainer {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  background-color: var(--bg);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hashtagContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--accent);
+  background-color: var(--accent-bg);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.authorContainer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.authorName {
+  font-weight: bold;
+  color: var(--text);
+}
+
+.accountId {
+  color: var(--text);
+}
+
+.createdAt {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.cardBody {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.textContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: var(--text-h);
+  line-height: 1.4;
+}
+
+.content {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.imageWrapper {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.imageCountBadge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.cardFooter {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.statsContainer {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text);
+  align-items: center;
+}
+
+/* 키보드 포커스는 앱 메뉴의 CSS에 의존하지 않는다. */
+.cardContainer:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }

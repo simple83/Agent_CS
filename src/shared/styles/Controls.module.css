@@ -1,0 +1,84 @@
+/* 필요한 요소에 직접 붙이는 공통 UI다. 부모의 모든 button/input을 선택하지 않는다. */
+.button {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.button[aria-pressed=true], .button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
+/* 필드의 배치와 입력 모양도 명시적으로 선택해야 적용된다. */
+.input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.button:focus-visible, .input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 안내·오류·말머리·작업 배치처럼 여러 화면에서 실제 공유하는 규칙만 둔다. */
+.help {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.error {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  color: var(--danger);
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

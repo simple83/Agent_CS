@@ -1,0 +1,69 @@
+/* 상세 페이지의 배치·제목·메타 정보다. 본문은 RichText에서 별도로 관리한다. */
+.container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+  color: var(--text-h);
+}
+
+.header {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: clamp(24px, 4vw, 36px);
+  font-weight: 500;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.author {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--text);
+}
+
+.meta {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.images {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.image {
+  width: 100%;
+  border-radius: 8px;
+}
+
+.hashtags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+
+.hashtag {
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 5px 8px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 16px 12px;
+  }
+}

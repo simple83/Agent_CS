@@ -1,0 +1,104 @@
+/* 목록의 필터와 검색 배치다. 컨트롤 모양은 각 요소의 공통 클래스로 적용한다. */
+.heading {
+  margin-bottom: 24px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.write {
+  flex-shrink: 0;
+}
+
+.search {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+/* 게시글 목록 표에만 적용한다. 다른 표나 본문의 버튼을 선택하지 않는다. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  background: var(--code-bg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.table th, .table td {
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.titleCell {
+  width: 55%;
+  overflow-wrap: anywhere;
+}
+
+.titleButton {
+  display: inline;
+  text-align: left;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.titleButton:hover {
+  text-decoration: underline;
+}
+
+.titleButton:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.commentCount {
+  color: var(--accent);
+  padding-left: 6px;
+  white-space: nowrap;
+}
+
+.rowMeta {
+  color: var(--text);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+@media (max-width: 600px) {
+  .controls {
+    align-items: flex-start;
+  }
+  .search {
+    grid-template-columns: 1fr auto;
+  }
+  .search input:first-child {
+    grid-column: 1 / -1;
+  }
+  .desktop {
+    display: none;
+  }
+  .titleCell {
+    width: auto;
+  }
+}

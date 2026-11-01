@@ -1,0 +1,111 @@
+/* 작성·상세가 명시적으로 공유하는 본문 계약이다. 전역 제목/코드 스타일에 의존하지 않는다. */
+.body {
+  color: var(--text-h);
+  font-size: 16px;
+  line-height: 1.7;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+/* Markdown과 편집기가 생성하는 요소만 본문 루트 아래에서 꾸민다. */
+.body p {
+  margin: 12px 0;
+  white-space: pre-wrap;
+}
+
+.body em {
+  font-style: italic;
+  font-synthesis: style;
+}
+
+.body strong {
+  font-weight: 700;
+}
+
+.body h1, .body h2, .body h3 {
+  margin: 20px 0 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.body h1 {
+  font-size: 28px;
+}
+
+.body h2 {
+  font-size: 24px;
+}
+
+.body h3 {
+  font-size: 20px;
+}
+
+.body ul, .body ol {
+  margin: 12px 0;
+  padding-left: 28px;
+}
+
+/* 편집기는 목록 항목 안에 문단을 생성하므로 상세의 간결한 목록과 간격을 맞춘다. */
+.body li > p {
+  margin: 0;
+}
+
+.body blockquote {
+  margin: 16px 0;
+  border-left: 3px solid var(--focus);
+  padding-left: 16px;
+  color: var(--text);
+}
+
+.body img {
+  max-width: 100%;
+  height: auto;
+}
+
+.body a {
+  color: var(--accent);
+}
+
+.body a:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.body hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 20px 0;
+}
+
+/* 배치와 공백은 여기서 통일하고 하이라이트 테마는 토큰의 색상만 담당한다. */
+.body pre {
+  margin: 0;
+  padding: 16px;
+  background: var(--syntax-bg);
+  color: var(--syntax-text);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.body pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 4;
+  overflow-wrap: normal;
+}
+
+.body :not(pre) > code {
+  display: inline;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--inline-code-bg);
+  color: var(--inline-code-text);
+  font-family: var(--mono);
+  font-size: 15px;
+}

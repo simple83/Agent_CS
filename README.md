@@ -42,3 +42,33 @@ Currently, two official plugins are available:
 - 등록 실패 시 현재 입력/첨부가 유지됩니다. 브라우저를 닫거나 다른 페이지로 이동한 뒤 복구하는 임시 저장은 아직 지원하지 않습니다.
 
 편집 기능 회귀 검증: `npm run test:editor` (말머리, 시각적 문서의 Markdown 저장/복원, 코드 공백·백틱, 언어 변경·실행 취소, 안전한 HTML 처리, 등록 실패와 재시도).
+
+## 게시글 기능 파일 위치
+
+화면을 수정할 때는 아래 역할별 폴더에서 시작합니다. 전용 CSS는 사용하는 컴포넌트 옆에 둡니다.
+
+```text
+src/features/post/
+├─ components/
+│  ├─ list/          # PostList, PostCard: 목록과 요약 카드
+│  ├─ write/         # PostForm: 제목·첨부·태그·등록
+│  │  └─ editor/     # PostEditor, CodeBlockEditor, Context, 편집기 설정·Markdown 변환
+│  ├─ detail/        # PostDetail, PostLikeControl: 상세 화면과 좋아요
+│  └─ content/       # PostContent와 작성·상세가 공유하는 본문·코드 스타일
+├─ styles/           # PostLayout: 목록·작성 화면 공통 배치
+├─ hooks/            # 조회·작성·좋아요 상태와 처리 흐름
+├─ services/         # Mock/Real API
+├─ types/            # 게시글과 API 데이터 타입
+├─ utils/            # 말머리·언어 목록 등 공통 보조 함수
+└─ mocks/            # 예제 게시글 데이터
+```
+
+`PostCard`는 현재 표 형태의 목록에서는 사용하지 않는 재사용 카드입니다. 상세 본문의 복사 도구인 `CodeBlock`은 `PostContent.tsx` 내부에 유지합니다. 편집기 전용 `visualEditor.ts`와 `PostEditorContext.ts`는 `write/editor/`에서 함께 관리합니다.
+
+## CSS 수정 기준
+
+- `src/index.css`는 기본 글꼴·줄 높이·박스 계산만, `src/styles/tokens.css`는 공통 색상·글꼴과 다크 모드 변수를 관리합니다. 전역에서 제목·코드·입력 요소의 디자인을 지정하지 않습니다.
+- 각 컴포넌트는 자신의 `*.module.css`를 직접 가져옵니다. 부모는 배치를 관리하고 자식의 모든 `button`, `label`, `select`를 일괄 선택하지 않습니다. 공용 입력·버튼은 `Controls.module.css`의 클래스를 해당 요소에 명시적으로 부여합니다.
+- 작성과 상세의 문단·강조·목록·코드 표현은 `RichText.module.css`, 코드 상자와 조작 바는 `CodeBlock.module.css`를 공유합니다. 편집기 전용 크기·도구 모음·포커스는 `PostEditor.module.css`에 둡니다.
+- `CodeSyntax.module.css`는 highlight.js GitHub Dark 테마를 로컬 루트 아래로 제한한 파일입니다. `hljs-*` 클래스 이름은 라이브러리 계약이므로 유지하고, 라이브러리 갱신 시 이 테마도 확인합니다. 외부 테마 CSS를 전역으로 중복 불러오지 않습니다.
+- 스타일 검증에서는 목록→작성→상세 이동과 직접 진입, 편집기 단독 배치, 밝은·어두운 테마, 모바일 폭, 키보드 포커스를 확인합니다. CSS Modules는 이름 충돌을 줄이지만 상속이나 넓은 자식 선택자까지 차단하지는 않습니다.

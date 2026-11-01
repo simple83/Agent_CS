@@ -1,0 +1,81 @@
+import { usePostDetail } from '../../hooks/usePostDetail';
+import { PostContent } from '../content/PostContent';
+import { PostLikeControl } from './PostLikeControl';
+import { getPostCategory } from '../../utils/postEditor';
+import styles from './PostDetail.module.css';
+import ui from '../../../../shared/styles/Controls.module.css';
+
+interface PostDetailProps {
+  postId: number;
+}
+
+/** 상세 조회 상태를 먼저 분기한 뒤 본문과 태그를 표시한다. 좋아요 변경 도구는 이 상세 화면에만 둔다. */
+export const PostDetail = ({ postId }: PostDetailProps) => {
+  const {
+    post,
+    isLoading,
+    error,
+  } = usePostDetail(postId);
+
+  if (isLoading) {
+    return <div>게시글을 불러오는 중입니다...</div>;
+  }
+
+  if (error) {
+    return <div>{error}</div>;
+  }
+
+  if (!post) {
+    return <div>게시글이 없습니다.</div>;
+  }
+
+  return (
+    <article className={styles.container}>
+      <header className={styles.header}>
+        <span className={ui.badge}>{getPostCategory(post.hashtags)}</span>
+        <h1 className={styles.title}>{post.title}</h1>
+
+        <div className={styles.author}>
+          <span>{post.author_username}</span>
+          <span>@{post.author_account_id}</span>
+        </div>
+
+        <div className={styles.meta}>
+          <span>조회 {post.view_count}</span>
+          <span>댓글 {post.comment_count}</span>
+        </div>
+      </header>
+
+      {/* 첨부는 본문 위에 모아 표시한다. 같은 URL이 반복되어도 키가 겹치지 않도록 순서를 함께 쓴다. */}
+      {post.image_urls.length > 0 && (
+        <div className={styles.images}>
+          {post.image_urls.map((imageUrl, index) => (
+            <img
+              key={`${index}-${imageUrl}`}
+              src={imageUrl}
+              alt={post.title}
+              className={styles.image}
+            />
+          ))}
+        </div>
+      )}
+
+      <PostContent content={post.content} />
+
+      {post.hashtags.length > 0 && (
+        <div className={styles.hashtags}>
+          {post.hashtags.map((hashtag) => (
+            <span
+              key={hashtag.id}
+              className={styles.hashtag}
+            >
+              #{hashtag.name}
+            </span>
+          ))}
+        </div>
+      )}
+      {/* 글 이동 또는 새 상세 합계를 받으면 해당 글의 좋아요 상태를 다시 확인한다. */}
+      <PostLikeControl key={`${post.id}:${post.like_count}`} postId={post.id} initialCount={post.like_count} />
+    </article>
+  );
+};

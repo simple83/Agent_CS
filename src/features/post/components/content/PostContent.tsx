@@ -1,10 +1,11 @@
 import { useRef, useState, type ComponentProps } from 'react';
 import Markdown, { type ExtraProps } from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-import { CODE_LANGUAGES } from '../utils/postEditor';
+import { CODE_LANGUAGES } from '../../utils/postEditor';
 
-import 'highlight.js/styles/github-dark.css';
-import './PostContent.css';
+import richText from './RichText.module.css';
+import syntax from './CodeSyntax.module.css';
+import codeStyles from './CodeBlock.module.css';
 
 interface PostContentProps {
   content: string;
@@ -31,10 +32,10 @@ const CodeBlock = ({ children, node, ...props }: ComponentProps<'pre'> & ExtraPr
       setMessage('복사하지 못했습니다. 코드를 선택해 직접 복사해 주세요.');
     }
   };
-  return <div className="post-code-block">
-    <div className="post-code-toolbar"><span>{label}</span><button type="button" onClick={() => void copy()} aria-label={`${label} 코드 복사`}>복사</button></div>
+  return <div className={codeStyles.block}>
+    <div className={codeStyles.bar}><span>{label}</span><button className={codeStyles.control} type="button" onClick={() => void copy()} aria-label={`${label} 코드 복사`}>복사</button></div>
     <pre {...props} ref={codeRef}>{children}</pre>
-    {message && <p className="post-copy-status" role="status">{message}</p>}
+    {message && <div className={codeStyles.status} role="status">{message}</div>}
   </div>;
 };
 
@@ -48,7 +49,7 @@ const markdownComponents = { pre: CodeBlock };
  */
 export const PostContent = ({ content }: PostContentProps) => {
   return (
-    <div className="post-content">
+    <div className={`${richText.body} ${syntax.syntax}`}>
       <Markdown rehypePlugins={[rehypeHighlight]} components={markdownComponents}>
         {content}
       </Markdown>

@@ -1,5 +1,5 @@
 import { useNavigate, useSearchParams } from 'react-router';
-import { PostList } from '../features/post/components/PostList';
+import { PostList } from '../features/post/components/list/PostList';
 import { isPostCategory } from '../features/post/utils/postEditor';
 
 /**

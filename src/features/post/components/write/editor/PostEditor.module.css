@@ -1,0 +1,79 @@
+/* 편집기는 부모 폼의 클래스 없이도 동일하게 표시된다. */
+.editor {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  color: var(--text-h);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--code-bg);
+}
+
+.label {
+  margin: 12px 12px 4px;
+}
+
+.body {
+  min-height: 320px;
+  padding: 16px;
+  outline: none;
+}
+
+.body:focus {
+  box-shadow: inset 0 0 0 2px var(--focus);
+}
+
+.body[contenteditable=false] {
+  opacity: .65;
+}
+
+/* 링크 입력과 도움말은 저장할 본문 밖에서 자체 간격을 관리한다. */
+.linkPanel {
+  margin: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+
+.linkActions {
+  margin-top: 12px;
+}
+
+.message {
+  margin: 12px;
+  font-size: 14px;
+}
+
+.help {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.help summary {
+  cursor: pointer;
+}
+
+.help summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.help p {
+  margin: 8px 0 0;
+}
+
+@media (max-width: 600px) {
+  .toolbar .toolButton {
+    padding: 8px;
+  }
+}

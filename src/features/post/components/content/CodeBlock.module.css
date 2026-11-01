@@ -1,0 +1,59 @@
+/* 작성·상세 공용 코드 상자다. 본문 타이포그래피와 조작 UI는 별도로 관리한다. */
+.block {
+  margin: 16px 0;
+  border: 1px solid var(--syntax-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--syntax-bg);
+  color: var(--syntax-text);
+}
+
+.bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--syntax-border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.language {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-weight: 600;
+}
+
+/* 코드 도구는 어두운 배경에 맞춘 독립 컨트롤로 작성 폼 스타일을 받지 않는다. */
+.control {
+  width: auto;
+  max-width: 150px;
+  padding: 4px 8px;
+  border: 1px solid var(--syntax-control-border);
+  border-radius: 4px;
+  background: var(--syntax-control-bg);
+  color: var(--syntax-text);
+  color-scheme: dark;
+  font: inherit;
+  cursor: pointer;
+}
+
+.control:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.control:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.status {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--syntax-border);
+  font-size: 12px;
+}

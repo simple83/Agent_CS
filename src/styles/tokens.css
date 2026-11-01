@@ -1,0 +1,44 @@
+/* 색상과 글꼴의 공용 계약이다. 여기서는 요소를 선택하거나 배치를 지정하지 않는다. */
+:root {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --bg: #fff;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #8430c6;
+  --accent-bg: rgba(170, 59, 255, .1);
+  --primary: #40558c;
+  --on-primary: #fff;
+  --focus: #6387df;
+  --danger: #b52c2c;
+  --inline-code-bg: #f1f3f5;
+  --inline-code-text: #b42360;
+  --shadow: 0 2px 4px rgba(0, 0, 0, .04);
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: Consolas, Monaco, 'Courier New', monospace;
+
+  /* 코드 상자는 두 테마 모두 어두운 배경을 사용하므로 별도 변수를 둔다. */
+  --syntax-bg: #0d1117;
+  --syntax-text: #e6edf3;
+  --syntax-border: #30363d;
+  --syntax-control-bg: #21262d;
+  --syntax-control-border: #484f58;
+}
+
+/* 각 컴포넌트는 같은 역할의 변수를 사용해 테마에 함께 반응한다. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #a8a2b1;
+    --text-h: #f3f4f6;
+    --bg: #16171d;
+    --border: #3e414b;
+    --code-bg: #242630;
+    --accent: #c084fc;
+    --accent-bg: rgba(192, 132, 252, .15);
+    --focus: #91b1ff;
+    --danger: #ff9090;
+    --inline-code-bg: #30303c;
+    --inline-code-text: #ff9ac6;
+    --shadow: 0 2px 4px rgba(0, 0, 0, .3);
+  }
+}

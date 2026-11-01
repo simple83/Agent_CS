@@ -1,12 +1,14 @@
 import { lazy, Suspense, useRef, type ChangeEvent, type FormEvent } from 'react';
-import { usePostForm } from '../hooks/usePostForm';
-import type { PostEntity } from '../types/post.types';
-import { POST_CATEGORIES, isPostCategory, type PostCategory } from '../utils/postEditor';
-import './PostBoard.css';
+import { usePostForm } from '../../hooks/usePostForm';
+import type { PostEntity } from '../../types/post.types';
+import { POST_CATEGORIES, isPostCategory, type PostCategory } from '../../utils/postEditor';
+import styles from './PostForm.module.css';
+import layout from '../../styles/PostLayout.module.css';
+import ui from '../../../../shared/styles/Controls.module.css';
 
 // 편집기 엔진은 작성 화면에 진입할 때만 내려받아 목록의 최초 로딩 비용을 줄인다.
 // 컴포넌트 외부에 선언하여 부모가 렌더링되어도 편집기와 입력 위치가 유지되게 한다.
-const PostEditor = lazy(() => import('./PostEditor').then((module) => ({ default: module.PostEditor })));
+const PostEditor = lazy(() => import('./editor/PostEditor').then((module) => ({ default: module.PostEditor })));
 
 interface PostFormProps {
   /** 저장 성공 알림을 Page에 반환하여 화면 전환 책임을 분리한다. */
@@ -45,22 +47,22 @@ export const PostForm = ({ onCreated, initialCategory }: PostFormProps) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="post-compose">
-      <header className="board-heading">
+    <form onSubmit={handleSubmit} className={`${layout.page} ${styles.form}`}>
+      <header className={layout.heading}>
         <h2>새 게시글 작성</h2>
         <p>코드와 지식을 나누고, 학과 친구들과 이야기해 보세요.</p>
       </header>
 
-      <div className="post-title-row">
-        <label>말머리
-          <select value={category} disabled={isLoading} onChange={(event) => {
+      <div className={styles.titleRow}>
+        <label className={ui.field}>말머리
+          <select className={ui.input} value={category} disabled={isLoading} onChange={(event) => {
             if (isPostCategory(event.target.value)) setCategory(event.target.value);
           }}>
             {POST_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
           </select>
         </label>
-        <label>제목 *
-          <input value={title} onChange={(event) => setTitle(event.target.value)}
+        <label className={ui.field}>제목 *
+          <input className={ui.input} value={title} onChange={(event) => setTitle(event.target.value)}
             disabled={isLoading} placeholder="제목을 입력해 주세요." />
         </label>
       </div>
@@ -70,33 +72,33 @@ export const PostForm = ({ onCreated, initialCategory }: PostFormProps) => {
       </Suspense>
 
       {/* 첨부는 기존 multipart images 필드로 전송한다. 본문 안에 이미지 주소를 넣지 않는다. */}
-      <section className="post-attachments" aria-label="이미지 첨부">
-        <label htmlFor="post-images">이미지 첨부</label>
-        <p className="post-help">첨부 이미지는 본문 위에 모아서 표시됩니다. 본문 중간 삽입은 아직 지원하지 않습니다.</p>
-        <input id="post-images" ref={fileInputRef} type="file"
+      <section className={styles.attachments} aria-label="이미지 첨부">
+        <label className={ui.field} htmlFor="post-images">이미지 첨부</label>
+        <p className={ui.help}>첨부 이미지는 본문 위에 모아서 표시됩니다. 본문 중간 삽입은 아직 지원하지 않습니다.</p>
+        <input className={styles.fileInput} id="post-images" ref={fileInputRef} type="file"
           accept="image/png,image/jpeg,image/gif,image/webp" multiple disabled={isLoading}
           onChange={handleImageChange} />
-        {images.length > 0 && <ul className="attachment-list">
+        {images.length > 0 && <ul className={styles.attachmentList}>
           {images.map((file, index) => <li key={`${index}-${file.name}`}>
             <span>{file.name} · {Math.ceil(file.size / 1024)}KB</span>
-            <button type="button" disabled={isLoading} aria-label={`${file.name} 첨부 제거`}
+            <button className={ui.button} type="button" disabled={isLoading} aria-label={`${file.name} 첨부 제거`}
               onClick={() => setImages(images.filter((_, position) => position !== index))}>제거</button>
           </li>)}
         </ul>}
       </section>
 
-      <label>주제 태그
-        <input value={hashtagInput} onChange={(event) => setHashtagInput(event.target.value)}
+      <label className={ui.field}>주제 태그
+        <input className={ui.input} value={hashtagInput} onChange={(event) => setHashtagInput(event.target.value)}
           disabled={isLoading} placeholder="React, TypeScript, 자료구조" />
       </label>
-      <p className="post-help">쉼표로 구분합니다. 말머리는 위에서 하나만 선택하고, 여기는 구체적인 주제를 적어 주세요.</p>
-      <div className="post-tag-preview" aria-label="저장할 태그">
-        {hashtags.map((tag) => <span key={tag}>#{tag}</span>)}
+      <p className={ui.help}>쉼표로 구분합니다. 말머리는 위에서 하나만 선택하고, 여기는 구체적인 주제를 적어 주세요.</p>
+      <div className={styles.tags} aria-label="저장할 태그">
+        {hashtags.map((tag) => <span className={ui.badge} key={tag}>#{tag}</span>)}
       </div>
 
-      {error && <p className="post-error" role="alert">{error}</p>}
-      <div className="post-actions">
-        <button type="submit" className="primary" disabled={isLoading}>
+      {error && <p className={ui.error} role="alert">{error}</p>}
+      <div className={ui.actions}>
+        <button type="submit" className={`${ui.button} ${ui.primary}`} disabled={isLoading}>
           {isLoading ? '등록 중...' : '게시글 등록'}
         </button>
       </div>

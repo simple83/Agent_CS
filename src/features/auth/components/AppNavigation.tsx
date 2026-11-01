@@ -1,3 +1,4 @@
+import styles from './AppNavigation.module.css';
 import { useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
@@ -23,17 +24,17 @@ export const AppNavigation = () => {
 
   return (
     <>
-      <nav className="app-nav" aria-label="주요 메뉴">
-        <NavLink to="/posts" end>게시글 목록</NavLink>
-        <NavLink to="/posts/create">글쓰기</NavLink>
+      <nav className={styles.nav} aria-label="주요 메뉴">
+        <NavLink className={styles.item} to="/posts" end>게시글 목록</NavLink>
+        <NavLink className={styles.item} to="/posts/create">글쓰기</NavLink>
         {loggedIn ? (
-          <button type="button" disabled={isLoading} onClick={() => void handleLogout()}>
+          <button className={styles.item} type="button" disabled={isLoading} onClick={() => void handleLogout()}>
             {isLoading ? '로그아웃 중...' : '로그아웃'}
           </button>
-        ) : <NavLink to="/login">로그인</NavLink>}
+        ) : <NavLink className={styles.item} to="/login">로그인</NavLink>}
       </nav>
 
-      {loggedIn && error && <p className="app-auth-error" role="alert">{error}</p>}
+      {loggedIn && error && <p className={styles.error} role="alert">{error}</p>}
     </>
   );
 };

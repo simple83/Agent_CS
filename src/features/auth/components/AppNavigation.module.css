@@ -1,0 +1,42 @@
+/* 메뉴와 인증 오류만 담당하고 다른 기능의 포커스 스타일은 소유하지 않는다. */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.item {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-h);
+  background: transparent;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.item:hover, .item[aria-current=page] {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.item:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 12px 0;
+  color: var(--danger);
+  text-align: center;
+  padding: 0 16px;
+}
