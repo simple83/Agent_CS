@@ -1,15 +1,15 @@
-import styles from '../../content/CodeBlock.module.css';
+import styles from './CodeBlock.module.css';
 import { useContext, type ChangeEvent } from 'react';
 import { NodeViewContent, NodeViewWrapper, type NodeViewProps } from '@tiptap/react';
-import { CODE_LANGUAGES } from '../../../utils/postEditor';
-import { PostEditorDisabledContext } from './PostEditorContext';
+import { CODE_LANGUAGES } from './codeFormatting';
+import { RichTextEditorDisabledContext } from './RichTextEditorContext';
 
 /**
  * 편집기 안의 코드블록 하나를 표시한다. 위쪽 바는 편집 대상에서 제외하고 코드만 입력받는다.
  * 언어는 별도 React 상태가 아니라 해당 문서 노드의 속성이므로 저장/복원/실행 취소에 포함된다.
  */
 export const CodeBlockEditor = ({ node, updateAttributes, editor }: NodeViewProps) => {
-  const disabled = useContext(PostEditorDisabledContext);
+  const disabled = useContext(RichTextEditorDisabledContext);
   const language = node.attrs.language || 'text';
   const knownLanguage = CODE_LANGUAGES.some(([value]) => value === language);
 

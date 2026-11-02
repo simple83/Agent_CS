@@ -16,6 +16,9 @@ const server = await createServer({ configFile: false, mode: 'mock',
   server: { middlewareMode: true, watch: null, hmr: false, ws: false },
   optimizeDeps: { noDiscovery: true, include: [] } });
 const { postApi } = await server.ssrLoadModule('/src/features/post/services/postApi.ts');
+// 좋아요 상태 전환만 관찰하도록 댓글 조회는 즉시 빈 목록으로 완료한다.
+const { commentApi } = await server.ssrLoadModule('/src/features/comment/services/commentApi.ts');
+commentApi.getComments = async () => [];
 const { usePostLike } = await server.ssrLoadModule('/src/features/post/hooks/usePostLike.ts');
 const { PostCard } = await server.ssrLoadModule('/src/features/post/components/list/PostCard.tsx');
 const { PostDetail } = await server.ssrLoadModule('/src/features/post/components/detail/PostDetail.tsx');

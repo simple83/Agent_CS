@@ -18,16 +18,16 @@ const server = await createServer({
   server: { middlewareMode: true, watch: null, hmr: false, ws: false },
   optimizeDeps: { noDiscovery: true, include: [] },
 });
-const { createVisualEditorExtensions, serializeVisualEditor, isWebLink } =
-  await server.ssrLoadModule('/src/features/post/components/write/editor/visualEditor.ts');
-const { PostContent } = await server.ssrLoadModule('/src/features/post/components/content/PostContent.tsx');
+const { createVisualEditorExtensions, insertCodeBlockBelow, serializeVisualEditor, isWebLink } =
+  await server.ssrLoadModule('/src/shared/components/richText/visualEditor.ts');
+const { MarkdownContent: PostContent } = await server.ssrLoadModule('/src/shared/components/richText/MarkdownContent.tsx');
 const editors = [];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-const { PostEditorDisabledContext } = await server.ssrLoadModule('/src/features/post/components/write/editor/PostEditorContext.ts');
+const { RichTextEditorDisabledContext: PostEditorDisabledContext } = await server.ssrLoadModule('/src/shared/components/richText/RichTextEditorContext.ts');
 
 /** 각 사례마다 문서/실행 취소 이력이 독립된 편집기를 만든다. */
-function makeEditor(content = '') {
-  const editor = new Editor({ extensions: createVisualEditorExtensions(), content, contentType: 'markdown' });
+function makeEditor(content = '', variant = 'post') {
+  const editor = new Editor({ extensions: createVisualEditorExtensions(variant), content, contentType: 'markdown' });
   editors.push(editor);
   return editor;
 }
@@ -187,4 +187,83 @@ test('본문 끝의 Shift+Enter와 빈 문단은 API 공백 정리 후에도 보
   assert.equal(detail.querySelectorAll('p').length, 2);
   assert.equal(detail.querySelectorAll('p')[1].textContent, '\u00a0');
   assert.ok(!detail.textContent.includes('\\'));
+});
+
+for (const variant of ['post', 'comment']) {
+  test(`${variant}: 코드 삽입은 문단 중간 커서·선택 범위에도 원문과 뒤 문단을 보존하고 한 번에 취소된다`, () => {
+    for (const selection of [3, { from: 2, to: 5 }]) {
+      const editor = makeEditor('작성 중인 설명입니다.\n\n뒤 문단', variant);
+      editor.commands.setTextSelection(selection);
+      const before = editor.getJSON();
+      assert.equal(editor.commands.command(insertCodeBlockBelow), true);
+      const doc = editor.state.doc;
+      assert.equal(doc.child(0).textContent, '작성 중인 설명입니다.');
+      assert.equal(doc.child(0).type.name, 'paragraph');
+      assert.equal(doc.child(1).type.name, 'codeBlock');
+      assert.equal(doc.child(1).textContent, '');
+      assert.equal(doc.child(1).attrs.language, 'text');
+      assert.equal(doc.child(2).textContent, '뒤 문단');
+      assert.equal(editor.state.selection.$from.parent.type.name, 'codeBlock');
+      editor.commands.undo();
+      assert.deepEqual(editor.getJSON(), before);
+      editor.commands.redo();
+      assert.equal(editor.state.doc.child(1).type.name, 'codeBlock');
+    }
+  });
+
+  test(`${variant}: 빈 글과 기존 코드에서도 별도 코드블록을 추가하고 읽기 전용에서는 변경하지 않는다`, () => {
+    for (const content of ['', '```python\nprint(1)\n```']) {
+      const editor = makeEditor(content, variant);
+      const original = editor.state.doc.firstChild.toJSON();
+      editor.commands.setTextSelection(1);
+      editor.commands.command(insertCodeBlockBelow);
+      assert.deepEqual(editor.state.doc.firstChild.toJSON(), original);
+      assert.equal(editor.state.doc.child(1).type.name, 'codeBlock');
+      assert.equal(editor.state.doc.child(1).textContent, '');
+      assert.equal(editor.state.doc.child(2).type.name, 'paragraph');
+      const before = editor.getJSON();
+      editor.setEditable(false);
+      assert.equal(editor.commands.command(insertCodeBlockBelow), false);
+      assert.deepEqual(editor.getJSON(), before);
+    }
+  });
+}
+
+test('게시글 목록·인용 안에서도 현재 문단 다음에 코드를 삽입하고 주변 구조를 보존한다', () => {
+  for (const content of ['- 목록 설명\n- 다음 항목', '> 인용 설명']) {
+    const editor = makeEditor(content);
+    let paragraphPosition;
+    editor.state.doc.descendants((node, position) => {
+      if (node.type.name === 'paragraph' && paragraphPosition === undefined) paragraphPosition = position;
+    });
+    editor.commands.setTextSelection(paragraphPosition + 2);
+    const before = editor.state.doc.textContent;
+    assert.equal(editor.commands.command(insertCodeBlockBelow), true);
+    const parent = editor.state.selection.$from.node(-1);
+    assert.equal(parent.child(0).type.name, 'paragraph');
+    assert.equal(parent.child(1).type.name, 'codeBlock');
+    assert.equal(editor.state.doc.textContent, before);
+  }
+});
+
+test('댓글 모드는 일반 문단·코드·줄바꿈만 제공하며 붙여넣기와 과거 서식에서도 텍스트는 보존한다', () => {
+  const editor = makeEditor('', 'comment');
+  for (const name of ['bold', 'italic', 'code', 'link']) assert.equal(editor.schema.marks[name], undefined);
+  for (const name of ['heading', 'bulletList', 'orderedList', 'blockquote', 'horizontalRule']) assert.equal(editor.schema.nodes[name], undefined);
+  editor.commands.insertContent('<p><strong>굵게</strong> <em>기울임</em> <a href="https://example.com">링크</a></p><ul><li>항목</li></ul>');
+  assert.equal(editor.view.dom.querySelector('strong, em, a, ul, ol, blockquote'), null);
+  assert.match(editor.state.doc.textContent, /굵게.*기울임.*링크.*항목/);
+  const restored = makeEditor('**굵게**와 *기울임*, `인라인` [링크](https://example.com)\n\n- 항목\n\n```cpp\nint n;\n```', 'comment');
+  assert.match(restored.state.doc.textContent, /굵게.*기울임.*인라인.*링크.*항목.*int n;/);
+  assert.equal(restored.view.dom.querySelector('strong, em, a, ul'), null);
+  const nested = makeEditor('## 제목\n\n> 인용\n\n1. 첫 항목\n   - **중첩** `코드`\n\n     ```python\n     print(1)\n     ```\n\n2. 끝 항목', 'comment');
+  assert.match(nested.state.doc.textContent, /제목.*인용.*첫 항목.*중첩.*코드.*print\(1\).*끝 항목/);
+  assert.equal(nested.view.dom.querySelector('h2, blockquote, ul, ol, strong'), null);
+  // React 코드 노드 뷰를 마운트하지 않은 엔진 테스트이므로 DOM 대신 문서 노드로 검증한다.
+  const blocks = nested.getJSON().content.filter((node) => node.type === 'codeBlock');
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].attrs.language, 'python');
+  assert.equal(blocks[0].content[0].text, 'print(1)');
+  nested.state.doc.check();
+  assert.equal(makeEditor(serializeVisualEditor(nested), 'comment').state.doc.textContent, nested.state.doc.textContent);
 });

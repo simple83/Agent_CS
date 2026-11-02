@@ -1,5 +1,6 @@
 import { MOCK_POSTS } from '../../features/post/mocks/mockPosts';
 import type { PostEntity } from '../../features/post/types/post.types';
+import type { CommentEntity } from '../../features/comment/types/comment.types';
 import { authStorage } from '../services/authStorage';
 
 const DATABASE_KEY = 'agent-cs:mock:v1:database';
@@ -27,7 +28,26 @@ export interface MockDatabase {
   sessions: MockSession[];
   // 기본 좋아요 수는 예시 합계이며, 이 맵에는 시연 계정이 추가한 좋아요만 기록한다.
   likes: Record<string, number[]>;
+  comments: CommentEntity[];
 }
+
+/** 첫 실행용 댓글과 답글이다. 실제로 존재하는 데이터만 집계하고 코드는 실행하지 않는 예시로 저장한다. */
+const createInitialComments = (): CommentEntity[] => [
+  { id: 1, post_id: 1, user_id: 102, username: '개발용사', account_id: 'dev_hero',
+    content: '저도 같이 먹고 싶어요!', parent_comment_id: null },
+  { id: 2, post_id: 1, user_id: 101, username: '진우', account_id: 'jinwoo99',
+    content: '좋아요. 수업 끝나고 만나요.', parent_comment_id: 1 },
+  { id: 3, post_id: 2, user_id: 101, username: '진우', account_id: 'jinwoo99',
+    content: '이전 값을 쓰는 방식이 좋겠습니다.\n\n```tsx\nsetCount((previous) => previous + 1);\n```', parent_comment_id: null },
+].map((comment) => ({ ...comment, profile_image_url: null, created_at: '2026-07-24T16:00:00+09:00',
+  updated_at: '2026-07-24T16:00:00+09:00', is_deleted: false, is_blurred: false, report_count: 0 }));
+
+/** 예시 숫자 대신 실제 댓글·대댓글 수를 반영한다. 다른 게시글 필드와 세션/좋아요는 변경하지 않는다. */
+const recountComments = (data: MockDatabase) => {
+  for (const post of data.posts) {
+    post.comment_count = data.comments.filter((comment) => comment.post_id === post.id && !comment.is_deleted).length;
+  }
+};
 
 /**
  * 저장된 DB를 읽거나 첫 실행에 예제 데이터의 복사본을 만든다.
@@ -37,13 +57,24 @@ export interface MockDatabase {
 export const readMockDatabase = (): MockDatabase => {
   const stored = localStorage.getItem(DATABASE_KEY);
   if (!stored) {
-    return { version: 1, posts: structuredClone(MOCK_POSTS), sessions: [], likes: {} };
+    const data: MockDatabase = { version: 1, posts: structuredClone(MOCK_POSTS), sessions: [], likes: {}, comments: createInitialComments() };
+    recountComments(data);
+    return data;
   }
   try {
     const data: MockDatabase = JSON.parse(stored);
     if (data.version !== 1 || !Array.isArray(data.posts) || !Array.isArray(data.sessions)
       || !data.likes || typeof data.likes !== 'object' || Array.isArray(data.likes)) {
       throw new Error('Invalid mock database');
+    }
+    // 기존 v1 저장소는 댓글이 없었다. 사용자가 만든 글/첨부/세션을 지우지 않고 필드만 추가한다.
+    // 과거 comment_count는 예시 숫자였으므로 존재하지 않는 댓글을 생성하지 않고 0으로 맞춘다.
+    if (data.comments === undefined) {
+      data.comments = [];
+      recountComments(data);
+      saveMockDatabase(data);
+    } else if (!Array.isArray(data.comments)) {
+      throw new Error('Invalid mock comments');
     }
     return data;
   } catch {

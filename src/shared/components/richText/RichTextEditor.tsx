@@ -1,19 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
-import { PostEditorDisabledContext } from './PostEditorContext';
-import { createVisualEditorExtensions, isWebLink, serializeVisualEditor } from './visualEditor';
-import styles from './PostEditor.module.css';
-import richText from '../../content/RichText.module.css';
-import syntax from '../../content/CodeSyntax.module.css';
-import ui from '../../../../../shared/styles/Controls.module.css';
+import { RichTextEditorDisabledContext } from './RichTextEditorContext';
+import { createVisualEditorExtensions, insertCodeBlockBelow, isWebLink, serializeVisualEditor } from './visualEditor';
+import styles from './RichTextEditor.module.css';
+import richText from './RichText.module.css';
+import syntax from './CodeSyntax.module.css';
+import ui from '../../styles/Controls.module.css';
 
-interface PostEditorProps {
+interface RichTextEditorProps {
   /** 부모는 API에 전송할 Markdown을 보관하고 편집기는 구조화된 문서를 관리한다. */
   content: string;
   onChange: (content: string) => void;
   disabled: boolean;
   /** 수정 화면은 기존 첨부를 유지하므로 붙여넣기 안내에서 파일 선택을 권하지 않는다. */
   imageAttachmentAvailable?: boolean;
+  /** 여러 댓글 폼을 함께 열어도 접근성 이름과 링크 입력 ID가 충돌하지 않게 구분한다. */
+  label?: string;
+  compact?: boolean;
+  /** 댓글은 텍스트·코드블록만 사용한다. 편집기 마운트 후에는 용도를 변경하지 않는다. */
+  variant?: 'post' | 'comment';
 }
 
 /**
@@ -21,13 +26,14 @@ interface PostEditorProps {
  * 입력할 때마다 Markdown만 부모에게 전달하고 문서를 다시 만들지 않는다.
  * 이 구분이 커서 위치, 한글 조합 입력, 실행 취소 이력을 유지하는 핵심이다.
  */
-export const PostEditor = ({ content, onChange, disabled, imageAttachmentAvailable = true }: PostEditorProps) => {
+export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAvailable = true, label = '게시글 내용', compact = false, variant = 'post' }: RichTextEditorProps) => {
+  const linkPanelId = useId();
   const lastPublished = useRef(content);
   const [showLink, setShowLink] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [message, setMessage] = useState('');
   // 확장 설정은 최초 한 번만 만든다. 본문 입력마다 언어/문법 설정을 다시 구성하지 않는다.
-  const [extensions] = useState(createVisualEditorExtensions);
+  const [extensions] = useState(() => createVisualEditorExtensions(variant));
 
   const editor = useEditor({
     extensions,
@@ -36,21 +42,20 @@ export const PostEditor = ({ content, onChange, disabled, imageAttachmentAvailab
     editable: !disabled,
     editorProps: {
       attributes: {
-        class: `${richText.body} ${syntax.syntax} ${styles.body}`,
+        class: `${richText.body} ${syntax.syntax} ${styles.body} ${compact ? styles.compact : ''}`,
         role: 'textbox',
-        'aria-label': '게시글 내용',
+        'aria-label': label,
         'aria-multiline': 'true',
-        'aria-describedby': 'visual-editor-help',
       },
       // 파일은 기존 첨부 절차로 안내한다. 일반 텍스트와 HTML 서식은 문서 규칙으로 처리한다.
       handlePaste: (_view, event) => {
         if (!event.clipboardData?.files.length) return false;
-        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '수정 화면에서는 기존 이미지를 유지하며 이미지 추가·교체를 지원하지 않습니다.');
+        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
         return true;
       },
       handleDrop: (_view, event) => {
         if (!event.dataTransfer?.files.length) return false;
-        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '수정 화면에서는 기존 이미지를 유지하며 이미지 추가·교체를 지원하지 않습니다.');
+        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
         return true;
       },
     },
@@ -92,6 +97,12 @@ export const PostEditor = ({ content, onChange, disabled, imageAttachmentAvailab
 
   if (!editor || !state) return <p role="status">본문 편집기를 준비하고 있습니다...</p>;
 
+  /** 버튼 클릭으로 잃은 본문 포커스를 새 코드블록으로 돌려 즉시 코드를 입력할 수 있게 한다. */
+  const addCodeBlock = () => {
+    if (disabled || !editor.commands.command(insertCodeBlockBelow)) return;
+    editor.view.focus();
+  };
+
   /** 링크 패널로 포커스가 이동해도 선택 범위는 유지된다. 기존 링크는 수정할 수 있다. */
   const openLink = () => {
     setLinkUrl(editor.getAttributes('link').href ?? '');
@@ -122,20 +133,23 @@ export const PostEditor = ({ content, onChange, disabled, imageAttachmentAvailab
     <section className={styles.editor} aria-label="본문 편집기">
       {/* 모든 도구는 type=button으로 선언해 부모 폼을 제출하지 않는다. */}
       <div className={styles.toolbar} role="group" aria-label="본문 서식 도구">
+        {variant === 'post' && <>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || !state.undo} onClick={() => editor.chain().focus().undo().run()}>실행 취소</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || !state.redo} onClick={() => editor.chain().focus().redo().run()}>다시 실행</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>굵게</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>기울임</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.code} onClick={() => editor.chain().focus().toggleCode().run()}>인라인 코드</button>
-        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.link} aria-expanded={showLink} aria-controls="editor-link-panel" onClick={openLink}>링크</button>
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.link} aria-expanded={showLink} aria-controls={linkPanelId} onClick={openLink}>링크</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>목록</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.orderedList} onClick={() => editor.chain().focus().toggleOrderedList().run()}>번호 목록</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.blockquote} onClick={() => editor.chain().focus().toggleBlockquote().run()}>인용</button>
-        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} aria-pressed={state.codeBlock} onClick={() => editor.chain().focus().toggleCodeBlock({ language: 'text' }).run()}>코드블록</button>
+        </>}
+        {/* 토글이 아닌 삽입 동작이다. 원문을 코드로 바꾸거나 이미 작성한 코드를 해제하지 않는다. */}
+        <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} onClick={addCodeBlock}>코드블록</button>
         {state.codeBlock && <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} onClick={() => editor.chain().focus().exitCode().run()}>코드 아래에 문단 추가</button>}
       </div>
 
-      {showLink && <fieldset id="editor-link-panel" className={styles.linkPanel} disabled={disabled}>
+      {variant === 'post' && showLink && <fieldset id={linkPanelId} className={styles.linkPanel} disabled={disabled}>
         <legend>링크 설정</legend>
         <label className={ui.field}>웹 주소
           <input className={ui.input} type="url" value={linkUrl} placeholder="https://example.com"
@@ -156,10 +170,10 @@ export const PostEditor = ({ content, onChange, disabled, imageAttachmentAvailab
       </fieldset>}
 
       {message && <p className={styles.message} role="status">{message}</p>}
-      <div className={styles.label}>내용 *</div>
-      <PostEditorDisabledContext.Provider value={disabled}>
+      <div className={styles.label}>{label} *</div>
+      <RichTextEditorDisabledContext.Provider value={disabled}>
         <EditorContent editor={editor} />
-      </PostEditorDisabledContext.Provider>
+      </RichTextEditorDisabledContext.Provider>
     </section>
   );
 };

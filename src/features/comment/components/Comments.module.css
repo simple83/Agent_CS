@@ -1,0 +1,67 @@
+/* 댓글 영역 안에서만 적용한다. 게시글 제목·편집기 내부 요소를 부모 선택자로 덮어쓰지 않는다. */
+.section {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+
+.heading, .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.heading {
+  justify-content: space-between;
+}
+
+/* 좁은 화면에서 버튼 묶음이 다음 줄로 내려가도 오른쪽 정렬을 유지한다. */
+.headingActions {
+  margin-left: auto;
+}
+
+.heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.list, .replies {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+}
+
+/* 답글 들여쓰기는 한 단계로 제한해 모바일에서도 코드블록 입력 공간을 확보한다. */
+.replies {
+  margin-left: 20px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+}
+
+.item {
+  min-width: 0;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.form {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 16px 0;
+}
+
+@media (max-width: 600px) {
+  .replies {
+    margin-left: 8px;
+    padding-left: 8px;
+  }
+}

@@ -30,6 +30,11 @@
   box-shadow: inset 0 0 0 2px var(--focus);
 }
 
+/* 댓글에는 같은 편집 기능을 제공하되 입력창의 최소 높이만 줄인다. */
+.compact {
+  min-height: 140px;
+}
+
 .body[contenteditable=false] {
   opacity: .65;
 }

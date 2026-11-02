@@ -1,5 +1,7 @@
+import { useCallback, useState } from 'react';
 import { usePostDetail } from '../../hooks/usePostDetail';
-import { PostContent } from '../content/PostContent';
+import { CommentSection } from '../../../comment/components/CommentSection';
+import { MarkdownContent } from '../../../../shared/components/richText/MarkdownContent';
 import { PostLikeControl } from './PostLikeControl';
 import { PostOwnerActions } from './PostOwnerActions';
 import { useAuthUserId } from '../../../auth/hooks/useAuthSession';
@@ -17,6 +19,9 @@ interface PostDetailProps {
 /** 상세 조회 상태를 먼저 분기한 뒤 본문과 태그를 표시한다. 좋아요 변경 도구는 이 상세 화면에만 둔다. */
 export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
   const userId = useAuthUserId();
+  const [commentCount, setCommentCount] = useState<{ postId: number; count: number } | null>(null);
+  // 댓글 목록만 조회해 받은 집계를 표시한다. 게시글 재조회로 조회수를 증가시키지 않는다.
+  const updateCommentCount = useCallback((count: number) => setCommentCount({ postId, count }), [postId]);
   const {
     post,
     isLoading,
@@ -54,7 +59,7 @@ export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
 
         <div className={styles.meta}>
           <span>조회 {post.view_count}</span>
-          <span>댓글 {post.comment_count}</span>
+          <span>댓글 {commentCount?.postId === postId ? commentCount.count : post.comment_count}</span>
         </div>
       </header>
 
@@ -72,7 +77,7 @@ export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
         </div>
       )}
 
-      <PostContent content={post.content} />
+      <MarkdownContent content={post.content} />
 
       {post.hashtags.length > 0 && (
         <div className={styles.hashtags}>
@@ -88,6 +93,7 @@ export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
       )}
       {/* 글 이동 또는 새 상세 합계를 받으면 해당 글의 좋아요 상태를 다시 확인한다. */}
       <PostLikeControl key={`${post.id}:${post.like_count}`} postId={post.id} initialCount={post.like_count} />
+      <CommentSection postId={post.id} postAuthorId={post.author_id} onCountChange={updateCommentCount} />
     </article>
   );
 };

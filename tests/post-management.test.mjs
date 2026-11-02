@@ -18,6 +18,9 @@ const server = await createServer({ configFile: false, mode: 'mock',
   define: { 'import.meta.env.VITE_MOCK_DELAY_MS': '"0"' },
 });
 const { postApi } = await server.ssrLoadModule('/src/features/post/services/postApi.ts');
+// 게시글 관리 회귀 검사는 댓글의 별도 지연과 분리한다. 댓글 실제 서비스/화면은 comments.test에서 검사한다.
+const { commentApi } = await server.ssrLoadModule('/src/features/comment/services/commentApi.ts');
+commentApi.getComments = async () => [];
 const { authApi } = await server.ssrLoadModule('/src/features/auth/services/authApi.ts');
 const { authStorage } = await server.ssrLoadModule('/src/shared/services/authStorage.ts');
 const { usePostForm } = await server.ssrLoadModule('/src/features/post/hooks/usePostForm.ts');

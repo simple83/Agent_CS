@@ -17,7 +17,7 @@ const server = await createServer({
   optimizeDeps: { noDiscovery: true, include: [] },
 });
 const utils = await server.ssrLoadModule('/src/features/post/utils/postEditor.ts');
-const { PostContent } = await server.ssrLoadModule('/src/features/post/components/content/PostContent.tsx');
+const { MarkdownContent: PostContent } = await server.ssrLoadModule('/src/shared/components/richText/MarkdownContent.tsx');
 const { postApi } = await server.ssrLoadModule('/src/features/post/services/postApi.ts');
 const { usePostForm } = await server.ssrLoadModule('/src/features/post/hooks/usePostForm.ts');
 const { PostDetailPage } = await server.ssrLoadModule('/src/pages/PostDetailPage.tsx');

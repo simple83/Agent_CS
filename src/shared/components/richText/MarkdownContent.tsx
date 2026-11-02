@@ -1,13 +1,13 @@
 import { useRef, useState, type ComponentProps } from 'react';
 import Markdown, { type ExtraProps } from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
-import { CODE_LANGUAGES } from '../../utils/postEditor';
+import { CODE_LANGUAGES } from './codeFormatting';
 
 import richText from './RichText.module.css';
 import syntax from './CodeSyntax.module.css';
 import codeStyles from './CodeBlock.module.css';
 
-interface PostContentProps {
+interface MarkdownContentProps {
   content: string;
 }
 
@@ -47,10 +47,13 @@ const markdownComponents = { pre: CodeBlock };
  * 원시 HTML을 실행하는 플러그인이나 기본 URL 검사를 우회하는 설정을 추가하지 않는다.
  * 하이라이트는 표시 전용이며 코드를 실행하지 않는다. 언어 미지정 코드의 자동 감지도 켜지 않는다.
  */
-export const PostContent = ({ content }: PostContentProps) => {
+export const MarkdownContent = ({ content }: MarkdownContentProps) => {
   return (
     <div className={`${richText.body} ${syntax.syntax}`}>
-      <Markdown rehypePlugins={[rehypeHighlight]} components={markdownComponents}>
+      {/* HTML은 기본 동작대로 텍스트로 표시하고 실제 요소로 해석하지 않는다. 이미지/임베드도 생성하지 않는다.
+          skipHtml로 예시 문자열 자체를 삭제하지 않는다. 코드 강조·복사는 문자열만 다루며 실행하지 않는다. */}
+      <Markdown disallowedElements={['img', 'iframe', 'object', 'embed', 'script', 'style']}
+        rehypePlugins={[rehypeHighlight]} components={markdownComponents}>
         {content}
       </Markdown>
     </div>

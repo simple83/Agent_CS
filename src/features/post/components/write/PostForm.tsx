@@ -8,7 +8,7 @@ import ui from '../../../../shared/styles/Controls.module.css';
 
 // 편집기 엔진은 작성 화면에 진입할 때만 내려받아 목록의 최초 로딩 비용을 줄인다.
 // 컴포넌트 외부에 선언하여 부모가 렌더링되어도 편집기와 입력 위치가 유지되게 한다.
-const PostEditor = lazy(() => import('./editor/PostEditor').then((module) => ({ default: module.PostEditor })));
+const PostEditor = lazy(() => import('../../../../shared/components/richText/RichTextEditor').then((module) => ({ default: module.RichTextEditor })));
 
 interface PostFormProps {
   /** 저장 성공 알림을 Page에 반환하여 화면 전환 책임을 분리한다. */
