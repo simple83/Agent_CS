@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { authStorage } from '../../../shared/services/authStorage';
 import { commentApi } from '../services/commentApi';
 import type { CommentEntity } from '../types/comment.types';
-import { getCommentSubtreeIds } from '../utils/comments';
 
 interface CommentState {
   comments: CommentEntity[] | null;
@@ -66,9 +65,9 @@ export const useComments = (postId: number, userId: number | null) => {
       setState((previous) => {
         let comments = previous.comments ?? [];
         if (deletedId !== undefined) {
-          // TODO(backend-reply-preservation): 부모만 삭제하도록 합의되면 이 연쇄 제거도 자리 표시 방식으로 바꾼다.
-          const removed = getCommentSubtreeIds(comments, deletedId);
-          comments = comments.filter((comment) => !removed.has(comment.id));
+          // 부모 자리만 삭제 상태로 바꾸고 답글은 유지한다. 재조회 실패 시에도 같은 정책을 적용한다.
+          comments = comments.map((comment) => comment.id === deletedId
+            ? { ...comment, is_deleted: true, content: '' } : comment);
         } else if (saved) {
           comments = [...comments.filter((comment) => comment.id !== saved.id), saved]
             .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id);

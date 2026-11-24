@@ -19,7 +19,7 @@ const initialState = (postId: number, count: number): LikeState => ({
 /**
  * 상세 화면의 좋아요 상태 조회와 등록/취소를 담당한다. 카드/목록에서는 사용하지 않는다.
  * 변경 요청 성공 후에만 합계를 조정하며, 상세를 다시 조회하지 않아 조회수를 추가로 올리지 않는다.
- * 합계는 상세 조회 시점의 값에 내 변경만 반영한다. 다른 사용자의 동시 변경은 다음 상세 조회에 반영된다.
+ * 변경 응답의 서버 집계를 사용해 다른 사용자의 동시 변경도 반영한다.
  */
 export const usePostLike = (postId: number, initialCount: number) => {
   const [state, setState] = useState(() => initialState(postId, initialCount));
@@ -80,11 +80,10 @@ export const usePostLike = (postId: number, initialCount: number) => {
     const wasLiked = state.liked;
     setState((previous) => ({ ...previous, status: 'saving', error: null }));
     try {
-      if (wasLiked) await postApi.unlikePost(postId);
-      else await postApi.likePost(postId);
+      const result = wasLiked ? await postApi.unlikePost(postId) : await postApi.likePost(postId);
       if (currentRequest !== requestId.current) return;
-      setState((previous) => ({ ...previous, liked: !wasLiked,
-        count: Math.max(0, previous.count + (wasLiked ? -1 : 1)), status: 'ready' }));
+      setState((previous) => ({ ...previous, liked: result.is_liked,
+        count: result.like_count, status: 'ready' }));
     } catch (error: unknown) {
       if (currentRequest !== requestId.current) return;
       setState((previous) => ({ ...previous, status: 'error',

@@ -1,30 +1,43 @@
+import { getPostCategory, type PostCategory } from '../utils/postEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { postApi } from '../services/postApi';
-import type { PostEntity, PostQueryParams } from '../types/post.types';
+import type { PostSummary, PostQueryParams } from '../types/post.types';
 
 /**
  * 목록의 최초 조회·검색·재조회를 구분해 관리한다. 처음에는 빈 목록이 아니라 로딩 상태로 시작한다.
  * 요청 번호를 비교해 늦게 도착한 이전 응답이 최신 검색 결과를 덮어쓰지 못하게 한다.
  */
-export const usePostList = (initialParams: PostQueryParams = {}) => {
+export const usePostList = (initialParams: PostQueryParams = {}, category: PostCategory | '' = '') => {
   // initialParams는 최초 조회 조건이다. 이후 조건 변경은 search로 처리한다.
   const [initialFilters] = useState(initialParams);
-  const [posts, setPosts] = useState<PostEntity[]>([]);
+  const [posts, setPosts] = useState<PostSummary[]>([]);
   const [filters, setFilters] = useState<PostQueryParams>(initialFilters);
   const [status, setStatus] = useState<
     'initial-loading' | 'searching' | 'refreshing' | 'success' | 'error'
   >('initial-loading');
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const nextOffset = useRef(0);
+  const loadingPage = useRef(false);
+  const [hasMore, setHasMore] = useState(false);
+  const pageSize = initialFilters.limit ?? 20;
 
   /** API 요청마다 번호를 올린다. 최신 요청의 성공/실패만 반영하며 실제 네트워크를 취소하지는 않는다. */
-  const fetchPosts = useCallback((params: PostQueryParams) => {
+  const fetchPosts = useCallback((params: PostQueryParams, append = false) => {
     const currentRequestId = ++requestId.current;
 
-    return postApi.getPosts(params).then(
+    loadingPage.current = true;
+    const limit = params.limit ?? pageSize;
+    const offset = append ? nextOffset.current : (params.offset ?? 0);
+    // 태그 API는 한 개만 검색한다. 주제와 말머리의 교집합은 페이지를 계속 읽으며 적용한다.
+    const tag = params.tag || (category && category !== '자유' ? category : undefined);
+    return postApi.getPosts({ ...params, tag, limit, offset }).then(
       (data) => {
         if (currentRequestId !== requestId.current) return;
-        setPosts(data);
+        nextOffset.current = offset + data.length;
+        setHasMore(data.length === limit);
+        const visible = data.filter((post) => !category || getPostCategory(post.hashtags) === category);
+        setPosts((previous) => append ? [...previous, ...visible.filter((post) => !previous.some((item) => item.id === post.id))] : visible);
         setStatus('success');
       },
       (err: unknown) => {
@@ -36,8 +49,8 @@ export const usePostList = (initialParams: PostQueryParams = {}) => {
         );
         setStatus('error');
       },
-    );
-  }, []);
+    ).finally(() => { if (currentRequestId === requestId.current) loadingPage.current = false; });
+  }, [category, pageSize]);
 
   // 마운트 시 한 번 조회한다. 초기 조건은 고정되어 렌더마다 새 객체를 전달해도 재요청하지 않는다.
   useEffect(() => {
@@ -53,6 +66,9 @@ export const usePostList = (initialParams: PostQueryParams = {}) => {
     const normalizedParams = {
       title: params.title?.trim() || undefined,
       tag: params.tag?.trim() || undefined,
+      sort: params.sort,
+      limit: params.limit,
+      offset: 0,
     };
 
     setFilters(normalizedParams);
@@ -68,8 +84,16 @@ export const usePostList = (initialParams: PostQueryParams = {}) => {
     return fetchPosts(filters);
   };
 
+  /** 서버 전체 개수를 추측하지 않는다. 마지막 페이지가 가득 찼으면 다음 범위를 조회할 수 있다. */
+  const loadMore = () => {
+    if (loadingPage.current || !hasMore) return;
+    setStatus('refreshing');
+    setError(null);
+    return fetchPosts(filters, true);
+  };
+
   return {
-    posts,
+    posts, hasMore, loadMore,
     filters,
     status,
     isLoading: status === 'initial-loading' || status === 'searching' || status === 'refreshing',

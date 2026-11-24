@@ -1,6 +1,6 @@
 import { lazy, Suspense, type FormEvent } from 'react';
 import { useCommentForm } from '../hooks/useCommentForm';
-import { COMMENT_MAX_LENGTH } from '../utils/comments';
+import { COMMENT_MAX_LENGTH, commentLength } from '../utils/comments';
 import ui from '../../../shared/styles/Controls.module.css';
 import styles from './Comments.module.css';
 
@@ -34,11 +34,11 @@ export const CommentForm = ({ label, initialContent = '', disabled, onSave, onSa
         compact variant="comment" label={`${label} 내용`} imageAttachmentAvailable={false} />
     </Suspense>
     <p className={ui.help}>코드블록에서 언어를 선택할 수 있습니다. 코드는 표시·복사만 지원합니다.</p>
-    <p className={ui.help}>{content.length.toLocaleString()} / {COMMENT_MAX_LENGTH.toLocaleString()}자 (서식 포함)</p>
+    <p className={ui.help}>{commentLength(content).toLocaleString()} / {COMMENT_MAX_LENGTH.toLocaleString()}자 (서식 포함)</p>
     {error && <p role="alert" className={ui.error}>{error}</p>}
     <div className={ui.actions}>
       {onCancel && <button className={ui.button} type="button" disabled={busy} onClick={onCancel}>취소</button>}
-      <button className={`${ui.button} ${ui.primary}`} type="submit" disabled={busy || content.length > COMMENT_MAX_LENGTH}>
+      <button className={`${ui.button} ${ui.primary}`} type="submit" disabled={busy || commentLength(content) > COMMENT_MAX_LENGTH}>
         {saving ? '저장 중...' : label === '댓글 수정' ? '수정 저장' : '등록'}
       </button>
     </div>

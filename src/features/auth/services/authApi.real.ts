@@ -7,6 +7,7 @@ import type {
   RefreshResponse,
 } from '../types/auth.types';
 
+import { ApiError } from '../../../shared/services/ApiError';
 import type { AuthApi } from '../types/authApi.types';
 import { realApiUrl } from '../../../shared/config/apiMode';
 
@@ -37,8 +38,8 @@ export const realAuthApi: AuthApi = {
     });
 
     if (!response.ok) {
-      throw new Error(
-        await getErrorMessage(response, '아이디 또는 비밀번호를 확인해주세요.'),
+      throw new ApiError(
+        await getErrorMessage(response, '아이디 또는 비밀번호를 확인해주세요.'), response.status,
       );
     }
 
@@ -54,8 +55,8 @@ export const realAuthApi: AuthApi = {
     });
 
     if (!response.ok) {
-      throw new Error(
-        await getErrorMessage(response, '로그인 갱신에 실패했습니다.'),
+      throw new ApiError(
+        await getErrorMessage(response, '로그인 갱신에 실패했습니다.'), response.status,
       );
     }
 
@@ -71,7 +72,7 @@ export const realAuthApi: AuthApi = {
     });
 
     if (!response.ok) {
-      throw new Error(await getErrorMessage(response, '로그아웃에 실패했습니다.'));
+      throw new ApiError(await getErrorMessage(response, '로그아웃에 실패했습니다.'), response.status);
     }
 
     return response.json();

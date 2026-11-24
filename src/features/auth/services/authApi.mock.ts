@@ -1,3 +1,4 @@
+import { ApiError } from '../../../shared/services/ApiError';
 import type { AuthApi } from '../types/authApi.types';
 import {
   MOCK_USERS, readMockDatabase, saveMockDatabase, waitForMockRequest,
@@ -20,7 +21,7 @@ export const mockAuthApi: AuthApi = {
       expires_at: Date.now() + 60 * 60 * 1000,
       refresh_expires_at: Date.now() + 7 * 24 * 60 * 60 * 1000,
     };
-    data.sessions = data.sessions.filter((item) => item.refresh_expires_at > Date.now());
+    data.sessions = data.sessions.filter((item) => item.refresh_expires_at > Date.now() && item.user_id !== user.id);
     data.sessions.push(session);
     saveMockDatabase(data);
     return {
@@ -37,26 +38,27 @@ export const mockAuthApi: AuthApi = {
     const data = readMockDatabase();
     const session = data.sessions.find((item) => item.refresh_token === refresh_token);
     if (!session || session.refresh_expires_at <= Date.now()) {
-      throw new Error('refresh token이 유효하지 않거나 만료되었습니다.');
+      throw new ApiError('refresh token이 유효하지 않거나 만료되었습니다.', 401);
     }
     session.access_token = `mock-access-${crypto.randomUUID()}`;
     session.expires_at = Date.now() + 60 * 60 * 1000;
     saveMockDatabase(data);
-    return { access_token: session.access_token, refresh_token, token_type: 'bearer' };
+    return { access_token: session.access_token, token_type: 'bearer' };
   },
   /**
-   * 해당 갱신 토큰의 세션을 삭제한다. 이미 없거나 만료된 세션도 로그아웃 완료로 취급한다.
-   * 오래된 토큰 때문에 화면 이동이 막히지 않게 하며 다른 세션·게시글은 보존한다.
+   * 해당 갱신 토큰의 세션을 삭제한다. 없거나 만료된 세션은 실제 API처럼 401로 전달한다.
+   * Hook에서 401을 로컬 로그아웃 완료로 처리한다. 다른 세션·게시글은 보존한다.
    * 저장소 오류/테스트 요청 실패는 그대로 전달하므로 실제 실패를 성공으로 숨기지는 않는다.
    */
   async logout({ refresh_token }) {
     await waitForMockRequest();
     const data = readMockDatabase();
     const session = data.sessions.find((item) => item.refresh_token === refresh_token);
+    if (!session || session.refresh_expires_at <= Date.now()) throw new ApiError('이미 종료되었거나 만료된 세션입니다.', 401);
     if (session) {
       data.sessions = data.sessions.filter((item) => item !== session);
       saveMockDatabase(data);
     }
-    return { detail: '로그아웃이 완료되었습니다.' };
+    return { message: '로그아웃되었습니다.' };
   },
 };

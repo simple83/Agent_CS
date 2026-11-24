@@ -10,6 +10,7 @@ import { createServer } from 'vite';
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' });
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
+globalThis.localStorage = dom.window.localStorage;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const server = await createServer({
   configFile: false, mode: 'mock',
@@ -31,6 +32,7 @@ after(async () => {
   dom.window.close();
   delete globalThis.window;
   delete globalThis.document;
+  delete globalThis.localStorage;
   delete globalThis.IS_REACT_ACT_ENVIRONMENT;
 });
 
@@ -163,24 +165,31 @@ test('작성 실패 후 초안 전체를 보존하고 재시도는 기존 API �
   }
   try {
     await act(async () => root.render(createElement(Probe)));
-    const markdown = '설명\n\n' + utils.codeFence('int value = 3;', 'cpp');
-    const image = new dom.window.File(['sample'], 'sample.png', { type: 'image/png' });
+    let markdown = '설명\n\n' + utils.codeFence('int value = 3;', 'cpp');
+    const image = new File(['sample'], 'sample.png', { type: 'image/png' });
     await act(async () => {
       form.setTitle(' 코드 질문 '); form.setContent(markdown);
-      form.setHashtagInput('C++, C++, 질문'); form.setImages([image]);
+      form.setHashtagInput('C++, C++, 질문');
+      const [added] = form.addImages([image]);
+      markdown += `\n\n![사진](${added.src})`;
+      form.setContent(markdown);
     });
     postApi.createPost = async () => { throw new Error('일시적인 오류'); };
     await act(async () => { await form.submit(); });
     assert.equal(form.content, markdown);
-    assert.equal(form.images[0], image);
+    assert.match(form.content, /blob:/);
     assert.equal(form.category, '코드리뷰');
     assert.equal(form.error, '일시적인 오류');
     postApi.createPost = async (params) => { submitted = params; return { id: 77 }; };
     await act(async () => { await form.submit(); });
-    assert.deepEqual(submitted, { title: '코드 질문', content: markdown, images: [image], hashtags: ['코드리뷰', 'C++'] });
+    assert.equal(submitted.title, '코드 질문');
+    assert.deepEqual(submitted.images, [image]);
+    assert.deepEqual(submitted.hashtags, ['코드리뷰', 'C++']);
+    assert.ok(submitted.content.includes(`upload://${submitted.image_ids[0]}`));
+    assert.ok(!submitted.content.includes('blob:'));
     assert.deepEqual(created, { id: 77 });
     assert.equal(form.content, '');
-    assert.equal(form.images.length, 0);
+    assert.equal(form.error, null);
   } finally {
     await act(async () => root.unmount()); container.remove(); postApi.createPost = originalCreate;
   }

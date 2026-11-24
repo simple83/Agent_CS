@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ApiError } from '../../../shared/services/ApiError';
 import { authApi } from '../services/authApi';
 import { authStorage } from '../../../shared/services/authStorage';
 import type { LoginRequest, LoginResponse } from '../types/auth.types';
@@ -49,9 +50,11 @@ export const useAuth = () => {
 
     try {
       const refreshed = await authApi.refresh({ refresh_token: refreshToken });
+      if (authStorage.getRefreshToken() !== refreshToken) return false;
       authStorage.saveTokens(refreshed);
       return true;
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401 && authStorage.getRefreshToken() === refreshToken) authStorage.clear();
       setError(
         err instanceof Error ? err.message : '로그인 갱신 중 오류가 발생했습니다.',
       );
@@ -63,14 +66,13 @@ export const useAuth = () => {
 
   /**
    * 클릭 시 토큰을 다시 읽어 오래된 메뉴 상태에서도 로그아웃을 처리한다.
-   * 액세스/갱신 토큰이 없으면 로컬 인증 정보를 정리하고 로그인 화면으로 이동할 수 있게 성공을 반환한다.
-   * 두 토큰이 있는 경우는 서버 무효화를 요청하며, 요청 실패 시 재시도할 수 있도록 세션을 유지한다.
+   * 갱신 토큰만으로 서버 세션을 종료한다. 이미 무효인 세션의 401도 로컬 로그아웃을 완료한다.
+   * 네트워크/서버 장애는 세션을 보존해 재시도할 수 있게 한다.
    */
   const logout = async (): Promise<boolean> => {
-    const accessToken = authStorage.getAccessToken();
     const refreshToken = authStorage.getRefreshToken();
 
-    if (!accessToken || !refreshToken) {
+    if (!refreshToken) {
       authStorage.clear();
       setUser(null);
       setError(null);
@@ -82,10 +84,17 @@ export const useAuth = () => {
 
     try {
       await authApi.logout({ refresh_token: refreshToken });
+      if (authStorage.getRefreshToken() !== refreshToken) return false;
       authStorage.clear();
       setUser(null);
       return true;
     } catch (err: unknown) {
+      // 다른 탭에서 새로 로그인한 토큰은 이전 요청의 인증 오류로 지우지 않는다.
+      if (err instanceof ApiError && err.status === 401 && authStorage.getRefreshToken() === refreshToken) {
+        authStorage.clear();
+        setUser(null);
+        return true;
+      }
       setError(
         err instanceof Error ? err.message : '로그아웃 처리 중 오류가 발생했습니다.',
       );

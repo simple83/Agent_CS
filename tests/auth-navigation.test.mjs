@@ -111,15 +111,15 @@ test('알림 없이 토큰이 삭제되어도 게시판 이동과 탭 복귀 때
   assert.equal(container.querySelector('button'), null);
 });
 
-test('표시 후 액세스 토큰이 사라지면 남은 갱신 토큰으로 API를 호출하지 않고 로그인으로 이동한다', async () => {
+test('표시 후 액세스 토큰이 사라지면 남은 갱신 토큰으로 세션을 종료하고 로그인으로 이동한다', async () => {
   authStorage.saveLogin(session);
   const container = await mountNavigation();
   let calls = 0;
-  authApi.logout = async () => { calls++; throw new Error('호출되면 안 됨'); };
+  authApi.logout = async (input) => { calls++; assert.equal(input.refresh_token, session.refresh_token); return { message: '종료' }; };
   // 같은 탭의 직접 삭제는 storage 이벤트가 없어 화면에 이전 로그아웃 버튼이 남는다.
   localStorage.removeItem('agent-cs:mock:auth:access_token');
   await act(async () => container.querySelector('button').click());
-  assert.equal(calls, 0);
+  assert.equal(calls, 1);
   assert.equal(authStorage.getRefreshToken(), null);
   assert.equal(authStorage.getUserId(), null);
   assert.equal(container.querySelector('output').textContent, '/login');
@@ -178,7 +178,7 @@ test('메뉴 표시 후 Mock 세션이 사라져도 로그아웃하면 로그인
   saveMockDatabase(database);
   let request;
   authApi.logout = (input) => (request = originalLogout(input));
-  await act(async () => { container.querySelector('button').click(); await request; });
+  await act(async () => { container.querySelector('button').click(); await request.catch((error) => assert.equal(error.status, 401)); });
   assert.equal(container.querySelector('output').textContent, '/login');
   assert.equal(authStorage.getAccessToken(), null);
   assert.equal(authStorage.getRefreshToken(), null);
@@ -195,8 +195,8 @@ test('갱신 토큰까지 만료되어도 로그아웃은 종료 처리하고 �
   saveMockDatabase(database);
   let request;
   authApi.logout = (input) => (request = originalLogout(input));
-  await act(async () => { container.querySelector('button').click(); await request; });
+  await act(async () => { container.querySelector('button').click(); await request.catch((error) => assert.equal(error.status, 401)); });
   assert.equal(container.querySelector('output').textContent, '/login');
   assert.equal(authStorage.getAccessToken(), null);
-  assert.deepEqual(readMockDatabase().sessions, [other]);
+  assert.deepEqual(readMockDatabase().sessions.filter((item) => item.user_id === 102), [other]);
 });

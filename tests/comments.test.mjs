@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+const contract = JSON.parse(readFileSync(new URL('./fixtures/api-contract.json', import.meta.url), 'utf8'));
 import assert from 'node:assert/strict';
 import { after, afterEach, test } from 'node:test';
 import { act, createElement, StrictMode } from 'react';
@@ -74,6 +76,11 @@ async function login(account_id = 'jinwoo99') {
 
 /** 정규 응답을 기반으로 소속·부모 등 필요한 값만 바꾼다. */
 const fixture = (overrides = {}) => ({ ...store.readMockDatabase().comments[0], ...overrides });
+/** HTTP 경계의 새 작성자 필드명으로 변환한다. 내부 화면 모델과 혼용하지 않는다. */
+const wireFixture = () => {
+  const { user_id, account_id, username, profile_image_url, is_blurred, report_count, ...rest } = fixture();
+  return { ...rest, author_id: user_id, author_account_id: account_id, author_username: username, author_image_url: profile_image_url ?? null, replies: [] };
+};
 const button = (container, text) => [...container.querySelectorAll('button')].find((node) => node.textContent === text);
 
 afterEach(async () => {
@@ -113,19 +120,20 @@ test('삭제·블라인드 원문은 상태에서 제거하고 삭제 부모의 
 test('기존 Mock 저장소를 확장해도 사용자 글·이미지·좋아요·세션은 보존하고 예시 댓글 수만 실제 값으로 맞춘다', () => {
   const legacy = store.readMockDatabase();
   delete legacy.comments;
-  legacy.posts[0].title = '사용자 수정 제목'; legacy.posts[0].image_urls = ['이미지'];
+  legacy.posts[0].title = '사용자 수정 제목'; legacy.posts[0].image_urls = ['https://example.test/legacy.png']; delete legacy.posts[0].images;
   legacy.likes = { 1: [101] }; legacy.sessions = [{ access_token: '보존할 토큰' }];
   localStorage.setItem('agent-cs:mock:v1:database', JSON.stringify(legacy));
   const migrated = store.readMockDatabase();
   assert.deepEqual(migrated.comments, []);
   assert.equal(migrated.posts[0].title, legacy.posts[0].title);
-  assert.deepEqual(migrated.posts[0].image_urls, legacy.posts[0].image_urls);
+  assert.equal(migrated.posts[0].images[0].image_url, legacy.posts[0].image_urls[0]);
+  assert.ok(migrated.posts[0].content.includes('https://example.test/legacy.png'));
   assert.deepEqual(migrated.likes, legacy.likes); assert.deepEqual(migrated.sessions, legacy.sessions);
   assert.equal(migrated.posts[0].comment_count, 0);
   assert.deepEqual(store.readMockDatabase(), migrated);
 });
 
-test('Mock 댓글·답글·수정·현재 계약의 연쇄 삭제는 집계를 유지하고 게시글 조회수를 올리지 않는다', async () => {
+test('Mock 댓글·답글·수정·부모만 삭제는 집계를 유지하고 게시글 조회수를 올리지 않는다', async () => {
   globalThis.fetch = () => { throw new Error('Mock은 네트워크를 사용하면 안 됨'); };
   await login();
   const before = store.readMockDatabase().posts[0].view_count;
@@ -137,11 +145,13 @@ test('Mock 댓글·답글·수정·현재 계약의 연쇄 삭제는 집계를 �
   await login();
   await commentApi.deleteComment(1, root.id);
   const comments = await commentApi.getComments(1);
-  assert.equal(comments.some((item) => item.id === root.id || item.id === reply.id), false);
+  assert.equal(comments.find((item) => item.id === root.id).is_deleted, true);
+  assert.equal(comments.find((item) => item.id === root.id).content, '');
+  assert.equal(comments.find((item) => item.id === reply.id).content, '수정 답글');
   const data = store.readMockDatabase();
-  assert.equal(data.posts[0].comment_count, comments.length);
+  assert.equal(data.posts[0].comment_count, comments.filter((item) => !item.is_deleted).length);
   assert.equal(data.posts[0].view_count, before);
-  assert.ok(data.comments.find((item) => item.id === reply.id).is_deleted);
+  assert.equal(data.comments.find((item) => item.id === reply.id).is_deleted, false);
   await assert.rejects(commentApi.createReply(1, root.id, '삭제 후 답글'), /삭제/);
 });
 
@@ -164,8 +174,8 @@ test('실제 API는 JSON content와 bearer만 보내며 경로 접두사를 중�
   const calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
-    return options.method === 'GET' ? Response.json([fixture()])
-      : options.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json(fixture());
+    return options.method === 'GET' ? Response.json([wireFixture()])
+      : options.method === 'DELETE' ? new Response(null, { status: 204 }) : Response.json(wireFixture());
   };
   await realCommentApi.getComments(1);
   await realCommentApi.createComment(1, '```js\nalert(1)\n```');
@@ -294,7 +304,7 @@ test('실제 댓글 화면에서 코드블록 언어 선택·등록·수정·삭
   let warning;
   window.confirm = (message) => { warning = message; return false; };
   await act(async () => button(article, '삭제').click());
-  assert.match(warning, /다른 사람이 작성한 답글/);
+  assert.match(warning, /기존 답글은 유지/);
   assert.equal(count, originalCount + 1);
   window.confirm = () => true;
   await act(async () => button(article, '삭제').click());
@@ -360,4 +370,55 @@ test('댓글 조회 실패는 게시글 본문을 유지하고 댓글 변경에�
   await act(async () => button(mounted.container, '댓글 다시 불러오기').click());
   await waitFor(() => mounted.container.textContent.includes('댓글 1개'));
   assert.equal(detailCalls, 1);
+});
+
+
+test('확정 문서의 중첩 댓글과 201 작성 응답을 내부 모델로 정상 변환한다', async () => {
+  globalThis.fetch = async () => Response.json(contract['GET /posts/{post_id}/comments']);
+  const source = contract['GET /posts/{post_id}/comments'];
+  const comments = await realCommentApi.getComments(source[0].post_id);
+  assert.ok(comments.length > 0);
+  assert.equal(comments.find((item) => item.id === source[0].id).user_id, source[0].author_id);
+  realAuth.saveLogin({ access_token: 'token', refresh_token: 'refresh', user_id: 1, account_id: 'user' });
+  for (const [key, call] of [
+    ['POST /posts/{post_id}/comments', (item) => realCommentApi.createComment(item.post_id, item.content)],
+    ['PATCH /posts/{post_id}/comments/{comment_id}', (item) => realCommentApi.updateComment(item.post_id, item.id, item.content)],
+    ['POST /posts/{post_id}/comments/{comment_id}/replies', (item) => realCommentApi.createReply(item.post_id, item.parent_comment_id, item.content)],
+  ]) {
+    const item = contract[key];
+    globalThis.fetch = async () => Response.json(item, { status: key.startsWith('POST') ? 201 : 200 });
+    const saved = await call(item);
+    assert.equal(saved.id, item.id); assert.equal(saved.user_id, item.author_id);
+    assert.equal(saved.content, item.content);
+  }
+});
+
+test('삭제 부모의 null 본문과 답글을 보존하고 정상 댓글의 null 본문은 오류로 구분한다', () => {
+  const parent = { ...wireFixture(), content: null, is_deleted: true };
+  parent.replies = [{ ...wireFixture(), id: 99, parent_comment_id: parent.id, content: '보존할 답글' }];
+  const result = utils.normalizeCommentResponse([parent], 1);
+  assert.equal(result.find((item) => item.id === parent.id).content, '');
+  assert.equal(utils.groupComments(result)[0].replies[0].content, '보존할 답글');
+  assert.throws(() => utils.normalizeCommentResponse([{ ...parent, is_deleted: false }], 1), /필수 정보/);
+  assert.throws(() => utils.normalizeCommentResponse([{ ...parent, replies: [{ ...parent.replies[0], parent_comment_id: 999 }] }], 1), /부모 정보/);
+});
+
+test('댓글은 이모지를 한 글자로 세며 Markdown 포함 5000자 경계를 적용한다', () => {
+  utils.validateCommentContent('😀'.repeat(5000));
+  assert.equal(utils.commentLength('😀'.repeat(5000)), 5000);
+  assert.throws(() => utils.validateCommentContent('😀'.repeat(5001)), /이내/);
+});
+
+test('부모 삭제 성공 뒤 목록 갱신에 실패해도 원문만 숨기고 답글·집계를 유지한다', async () => {
+  await login();
+  const parent = fixture({ user_id: 101 });
+  const reply = fixture({ id: 99, parent_comment_id: parent.id, content: '남길 답글' });
+  commentApi.getComments = async () => [parent, reply];
+  const hook = await mountHook(() => useComments(1, 101));
+  commentApi.deleteComment = async () => {};
+  commentApi.getComments = async () => { throw new Error('갱신 실패'); };
+  await act(async () => { await hook.current.remove(parent.id); });
+  assert.equal(hook.current.comments.find((item) => item.id === parent.id).content, '');
+  assert.equal(hook.current.comments.find((item) => item.id === reply.id).is_deleted, false);
+  assert.match(hook.current.error, /변경은 완료/);
 });

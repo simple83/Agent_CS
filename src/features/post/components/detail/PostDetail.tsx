@@ -63,21 +63,7 @@ export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
         </div>
       </header>
 
-      {/* 첨부는 본문 위에 모아 표시한다. 같은 URL이 반복되어도 키가 겹치지 않도록 순서를 함께 쓴다. */}
-      {post.image_urls.length > 0 && (
-        <div className={styles.images}>
-          {post.image_urls.map((imageUrl, index) => (
-            <img
-              key={`${index}-${imageUrl}`}
-              src={imageUrl}
-              alt={post.title}
-              className={styles.image}
-            />
-          ))}
-        </div>
-      )}
-
-      <MarkdownContent content={post.content} />
+      <MarkdownContent content={post.content} allowImages />
 
       {post.hashtags.length > 0 && (
         <div className={styles.hashtags}>

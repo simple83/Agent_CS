@@ -10,9 +10,11 @@ import ui from '../../styles/Controls.module.css';
 interface RichTextEditorProps {
   /** 부모는 API에 전송할 Markdown을 보관하고 편집기는 구조화된 문서를 관리한다. */
   content: string;
+  /** 선택 파일을 부모 폼에 보관하고 편집기에 삽입할 임시 URL을 반환한다. */
+  onImageFiles?: (files: File[]) => { src: string; alt: string }[];
   onChange: (content: string) => void;
   disabled: boolean;
-  /** 수정 화면은 기존 첨부를 유지하므로 붙여넣기 안내에서 파일 선택을 권하지 않는다. */
+  /** 댓글 등 이미지가 없는 입력창에서는 파일 선택 안내를 표시하지 않는다. */
   imageAttachmentAvailable?: boolean;
   /** 여러 댓글 폼을 함께 열어도 접근성 이름과 링크 입력 ID가 충돌하지 않게 구분한다. */
   label?: string;
@@ -26,7 +28,8 @@ interface RichTextEditorProps {
  * 입력할 때마다 Markdown만 부모에게 전달하고 문서를 다시 만들지 않는다.
  * 이 구분이 커서 위치, 한글 조합 입력, 실행 취소 이력을 유지하는 핵심이다.
  */
-export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAvailable = true, label = '게시글 내용', compact = false, variant = 'post' }: RichTextEditorProps) => {
+export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAvailable = true, label = '게시글 내용', compact = false, variant = 'post', onImageFiles }: RichTextEditorProps) => {
+  const imageInput = useRef<HTMLInputElement>(null);
   const linkPanelId = useId();
   const lastPublished = useRef(content);
   const [showLink, setShowLink] = useState(false);
@@ -47,15 +50,15 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
         'aria-label': label,
         'aria-multiline': 'true',
       },
-      // 파일은 기존 첨부 절차로 안내한다. 일반 텍스트와 HTML 서식은 문서 규칙으로 처리한다.
+      // 파일은 이미지 도구 버튼으로 안내한다. 일반 텍스트와 HTML 서식은 문서 규칙으로 처리한다.
       handlePaste: (_view, event) => {
         if (!event.clipboardData?.files.length) return false;
-        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
+        setMessage(imageAttachmentAvailable ? '이미지는 도구 모음의 이미지 버튼에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
         return true;
       },
       handleDrop: (_view, event) => {
         if (!event.dataTransfer?.files.length) return false;
-        setMessage(imageAttachmentAvailable ? '이미지는 아래 이미지 첨부에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
+        setMessage(imageAttachmentAvailable ? '이미지는 도구 모음의 이미지 버튼에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
         return true;
       },
     },
@@ -134,6 +137,22 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
       {/* 모든 도구는 type=button으로 선언해 부모 폼을 제출하지 않는다. */}
       <div className={styles.toolbar} role="group" aria-label="본문 서식 도구">
         {variant === 'post' && <>
+        {onImageFiles && <>
+          <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock}
+            onClick={() => imageInput.current?.click()}>이미지</button>
+          <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden
+            aria-label="본문 이미지 선택" disabled={disabled} onChange={(event) => {
+              // 선택 직전의 커서 위치로 돌아가 이미지를 삽입한다. 실패하면 기존 문서는 유지한다.
+              try {
+                const items = onImageFiles(Array.from(event.target.files ?? []));
+                editor.chain().focus().insertContent(items.flatMap((attrs) => [
+                  { type: 'image', attrs }, { type: 'text', text: ' ' },
+                ])).run();
+                setMessage('이미지를 선택해 Delete/Backspace로 본문에서 제거할 수 있습니다.');
+              } catch (error) { setMessage(error instanceof Error ? error.message : '이미지를 추가하지 못했습니다.'); }
+              event.target.value = '';
+            }} />
+        </>}
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || !state.undo} onClick={() => editor.chain().focus().undo().run()}>실행 취소</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || !state.redo} onClick={() => editor.chain().focus().redo().run()}>다시 실행</button>
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || state.codeBlock} aria-pressed={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>굵게</button>

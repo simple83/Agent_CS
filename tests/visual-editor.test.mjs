@@ -267,3 +267,41 @@ test('댓글 모드는 일반 문단·코드·줄바꿈만 제공하며 붙여�
   nested.state.doc.check();
   assert.equal(makeEditor(serializeVisualEditor(nested), 'comment').state.doc.textContent, nested.state.doc.textContent);
 });
+
+
+const { imageReferences, mapMarkdownImages, imageMarkdown } = await server.ssrLoadModule('/src/shared/components/richText/markdownImages.ts');
+
+test('이미지 전용 글·문단 사이 이미지·쿼리가 있는 URL을 편집하고 재저장해도 보존한다', () => {
+  const url = 'https://example.test/photo(1).png?signature=a%2Bb&expires=123';
+  for (const content of [imageMarkdown('사진 [원본]', url), `앞 문단\n\n${imageMarkdown('사진', url)}\n\n뒤 문단`]) {
+    const editor = makeEditor(content);
+    const saved = serializeVisualEditor(editor);
+    assert.deepEqual(imageReferences(saved), [url]);
+    assert.deepEqual(makeEditor(saved).getJSON(), editor.getJSON());
+    const markup = renderToStaticMarkup(createElement(PostContent, { content: saved, allowImages: true }));
+    const container = document.createElement('div'); container.innerHTML = markup;
+    assert.equal(container.querySelector('img').getAttribute('src'), url);
+    assert.equal(container.querySelector('img').getAttribute('referrerpolicy'), 'no-referrer');
+  }
+});
+
+test('실제 이미지 참조만 치환하고 코드·인라인 코드의 upload 예시는 그대로 보존한다', () => {
+  const content = '![사진][ref]\n\n[ref]: upload://one\n\n`![예시](upload://example)`\n\n```md\n![예시](upload://code)\n```';
+  assert.deepEqual(imageReferences(content), ['upload://one']);
+  const changed = mapMarkdownImages(content, () => 'https://example.test/saved.png');
+  assert.ok(changed.includes('`![예시](upload://example)`'));
+  assert.ok(changed.includes('![예시](upload://code)'));
+  assert.deepEqual(imageReferences(changed), ['https://example.test/saved.png']);
+});
+
+test('게시글도 실행 가능한 이미지 URL·SVG·HTML을 표시하지 않으며 댓글은 이미지 기능이 없다', () => {
+  const content = '![위험](javascript:alert%281%29)\n\n![SVG](data:image/svg+xml;base64,PHN2Zz4=)\n\n<img src=x onerror=alert(1)>';
+  const editor = makeEditor(content);
+  assert.equal(editor.view.dom.querySelectorAll('img,script,iframe').length, 0);
+  const container = document.createElement('div');
+  container.innerHTML = renderToStaticMarkup(createElement(PostContent, { content, allowImages: true }));
+  assert.equal(container.querySelectorAll('img[src],script,iframe,[onerror]').length, 0);
+  const comment = makeEditor('![사진](https://example.test/photo.png)', 'comment');
+  assert.equal(comment.schema.nodes.image, undefined);
+  assert.equal(comment.view.dom.querySelector('img'), null);
+});

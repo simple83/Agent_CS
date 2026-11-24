@@ -1,7 +1,7 @@
 import { readMockDatabase, requireMockUser, saveMockDatabase, waitForMockRequest, type MockDatabase } from '../../../shared/mocks/mockStore';
 import type { CommentApi, CommentEntity } from '../types/comment.types';
 import { authStorage } from '../../../shared/services/authStorage';
-import { getCommentSubtreeIds, normalizeComments, validateCommentContent, validateCommentId } from '../utils/comments';
+import { normalizeComments, validateCommentContent, validateCommentId } from '../utils/comments';
 
 /** 댓글 API에서도 게시글 존재와 삭제 상태를 검사한다. 상세 조회를 호출하지 않아 조회수는 증가하지 않는다. */
 const findPost = (data: MockDatabase, postId: number) => {
@@ -71,7 +71,7 @@ export const mockCommentApi: CommentApi = {
     await waitForMockRequest();
     const data = readMockDatabase();
     findPost(data, postId);
-    return normalizeComments(data.comments.filter((comment) => comment.post_id === postId && !comment.is_deleted), postId);
+    return normalizeComments(data.comments.filter((comment) => comment.post_id === postId), postId);
   },
   createComment: (postId, content) => create(postId, content, null),
   createReply: (postId, parentId, content) => create(postId, content, parentId),
@@ -89,14 +89,11 @@ export const mockCommentApi: CommentApi = {
   async deleteComment(postId, id) {
     await waitForMutation();
     const data = readMockDatabase();
-    findOwnedComment(data, postId, id);
-    // TODO(backend-reply-preservation): 합의 후 부모만 삭제 표시하고 대댓글은 유지한다.
-    // 현재 서버 명세는 답글까지 연쇄 소프트 삭제한다. Mock만 보존하도록 바꾸면 실제 동작을 오인하게 된다.
-    // 변경 시 GET의 삭제 부모 자리 반환, UI 확인 문구, 집계 및 테스트도 함께 수정해야 한다.
-    const removed = getCommentSubtreeIds(data.comments.filter((comment) => comment.post_id === postId), id);
-    for (const comment of data.comments) {
-      if (removed.has(comment.id)) { comment.is_deleted = true; comment.updated_at = new Date().toISOString(); }
-    }
+    // 원본은 화면에 반환하지 않고 부모 자리와 기존 답글을 보존한다.
+    const comment = findOwnedComment(data, postId, id);
+    comment.is_deleted = true;
+    comment.content = '';
+    comment.updated_at = new Date().toISOString();
     saveComments(data, postId);
   },
 };

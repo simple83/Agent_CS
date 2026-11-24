@@ -28,8 +28,8 @@ const roots = [];
 
 beforeEach(() => {
   postApi.getLikeStatus = async () => false;
-  postApi.likePost = async () => ({ detail: '등록' });
-  postApi.unlikePost = async () => ({ detail: '취소' });
+  postApi.likePost = async () => ({ post_id: 1, like_count: 6, is_liked: true });
+  postApi.unlikePost = async () => ({ post_id: 1, like_count: 5, is_liked: false });
 });
 
 // 루트/API 대역을 복구해 테스트끼리 요청과 상태가 섞이지 않게 한다.
@@ -82,8 +82,8 @@ test('카드는 통계만 표시하며 좋아요 영역을 클릭해도 변경 A
 test('상세에서만 좋아요를 등록/취소하고 조회수 증가 요청을 다시 보내지 않는다', async () => {
   let reads = 0, likes = 0, unlikes = 0;
   postApi.getPost = async () => { reads++; return MOCK_POSTS[0]; };
-  postApi.likePost = async () => { likes++; return { detail: '등록' }; };
-  postApi.unlikePost = async () => { unlikes++; return { detail: '취소' }; };
+  postApi.likePost = async () => { likes++; return { post_id: 1, like_count: 6, is_liked: true }; };
+  postApi.unlikePost = async () => { unlikes++; return { post_id: 1, like_count: 5, is_liked: false }; };
   const { container } = await mount(createElement(PostDetail, { postId: 1 }));
   const region = container.querySelector('[aria-label="게시글 좋아요"]');
   assert.ok(region);
@@ -117,7 +117,7 @@ test('같은 렌더의 연속 클릭은 한 번만 전송하고 성공 전에는
   let first;
   await act(async () => { first = hook.current.toggle(); void hook.current.toggle(); });
   assert.equal(calls, 1); assert.equal(hook.current.count, 5); assert.equal(hook.current.status, 'saving');
-  await act(async () => { finish({ detail: '성공' }); await first; });
+  await act(async () => { finish({ post_id: 1, like_count: 6, is_liked: true }); await first; });
   assert.equal(hook.current.count, 6); assert.equal(hook.current.liked, true);
 });
 
@@ -141,9 +141,20 @@ test('글 전환·언마운트 뒤의 이전 변경 응답은 현재 글 상태�
   let pending;
   await act(async () => { pending = hook.current.toggle(); });
   await hook.change(2, 12);
-  await act(async () => { finish({ detail: '성공' }); await pending; });
+  await act(async () => { finish({ post_id: 1, like_count: 6, is_liked: true }); await pending; });
   assert.equal(hook.current.postId, 2); assert.equal(hook.current.count, 12); assert.equal(hook.current.liked, false);
   await act(async () => { pending = hook.current.toggle(); });
   await hook.unmount();
-  await act(async () => { finish({ detail: '성공' }); await pending; });
+  await act(async () => { finish({ post_id: 1, like_count: 6, is_liked: true }); await pending; });
+});
+
+
+test('좋아요 완료 후 합계는 이전 숫자에 1을 더하지 않고 서버가 반환한 값을 사용한다', async () => {
+  const hook = await mountLike(1, 5);
+  postApi.likePost = async () => ({ post_id: 1, like_count: 42, is_liked: true });
+  await act(async () => { await hook.current.toggle(); });
+  assert.equal(hook.current.count, 42); assert.equal(hook.current.liked, true);
+  postApi.unlikePost = async () => ({ post_id: 1, like_count: 44, is_liked: false });
+  await act(async () => { await hook.current.toggle(); });
+  assert.equal(hook.current.count, 44); assert.equal(hook.current.liked, false);
 });

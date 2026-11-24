@@ -54,18 +54,18 @@ const StatsGroup = ({ post }: Pick<PostCardProps, 'post'>) => (
 
 /* 첫 이미지를 썸네일로 사용하고 나머지 이미지 수를 표시한다. 첨부가 없으면 렌더링하지 않는다. */
 const ThumbnailImage = ({ post }: { post: PostEntity }) => {
-  if (post.image_urls.length === 0) return null;
+  if (post.images.length === 0) return null;
 
   return (
     <div className={styles.imageWrapper}>
       <img
-        src={post.image_urls[0]}
+        src={post.images[0].image_url}
         alt={post.title}
         className={styles.thumbnail}
       />
-      {post.image_urls.length > 1 && (
+      {post.images.length > 1 && (
         <span className={styles.imageCountBadge}>
-          +{post.image_urls.length - 1}
+          +{post.images.length - 1}
         </span>
       )}
     </div>

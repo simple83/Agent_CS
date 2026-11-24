@@ -21,7 +21,6 @@ export interface RefreshRequest {
 /* 갱신 후 저장할 토큰 묶음. 현재 계약에서는 리프레시 토큰은 유지된다. */
 export interface RefreshResponse {
   access_token: string;
-  refresh_token: string;
   token_type: string;
 }
 
@@ -32,5 +31,5 @@ export interface LogoutRequest {
 
 /* 로그아웃 등에서 반환하는 서버 안내 문구다. */
 export interface DetailResponse {
-  detail: string;
+  message: string;
 }

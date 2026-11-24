@@ -8,34 +8,50 @@ export interface Hashtag {
 
 /**
  * 서버의 게시글 응답 구조. category라는 별도 필드는 없으며 화면에서 hashtags로 말머리를 추론한다.
- * TypeScript 타입 선언은 서버 응답을 런타임에 검증하지 않으므로 실제 서버 연결 시 계약 확인이 필요하다.
+ * 서비스 경계의 postContract에서 필수 필드를 검증하고 목록과 상세를 구분한다.
  */
-export interface PostEntity {
+export interface PostSummary {
   id: number;
   title: string;
-  /** 일반 설명과 코드 블록을 함께 저장하는 Markdown 문자열이다. */
-  content: string;
-  /** 본문 내 위치 정보가 없는 첨부 이미지 목록이다. */
-  image_urls: string[];
   author_id: number;
   author_account_id: string;
   author_username: string;
-  author_image_url: string;
+  author_image_url: string | null;
   hashtags: Hashtag[];
   like_count: number;
   comment_count: number;
   view_count: number;
   created_at: string;
   updated_at: string;
-  is_blurred: boolean;
+}
+
+/** 기존 이미지 ID는 수정 요청의 keep_image_ids에 사용한다. URL은 만료될 수 있다. */
+export interface PostImage {
+  id: number;
+  image_url: string;
+}
+
+/** 목록에 없는 본문과 이미지 정보는 상세 조회에서만 얻는다. */
+export interface PostEntity extends PostSummary {
+  content: string;
+  images: PostImage[];
   is_deleted: boolean;
-  report_count: number;
+}
+
+/** 좋아요 변경 후 서버가 확정한 상태와 집계를 그대로 표시한다. */
+export interface PostLikeResponse {
+  post_id: number;
+  like_count: number;
+  is_liked: boolean;
 }
 
 /** GET /posts 검색 조건. 제목과 태그를 함께 넘기면 두 조건의 교집합을 요청한다. */
 export interface PostQueryParams {
   title?: string;
   tag?: string;
+  sort?: 'created_at' | 'view_count';
+  limit?: number;
+  offset?: number;
 }
 
 /** 작성 입력. File 배열과 태그 이름 배열은 서비스에서 multipart로 직렬화한다. */
@@ -43,18 +59,21 @@ export interface CreatePostParams {
   title: string;
   content: string;
   images?: File[];
+  image_ids?: string[];
   hashtags?: string[];
 }
 
-/** 수정 입력. 생략한 필드는 유지한다. 이미지 삭제 방식은 실제 서버와 추가 합의가 필요하다. */
+/** 수정 입력. 생략한 필드는 유지한다. keep_image_ids 생략은 기존 이미지 유지, 빈 배열은 전체 제거 요청이다. */
 export interface UpdatePostParams {
+  keep_image_ids?: number[];
   title?: string;
   content?: string;
   images?: File[];
+  image_ids?: string[];
   hashtags?: string[];
 }
 
-/** 삭제·좋아요 등에서 돌려주는 서버 안내 문구다. */
+/** 게시글 삭제에서 돌려주는 서버 안내 문구다. */
 export interface DetailResponse {
   detail: string;
 }

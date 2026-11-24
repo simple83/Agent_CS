@@ -92,7 +92,7 @@ test('목록은 첫 렌더부터 로딩이며 초기 검색 조건 변경으로 
   const hook = await renderHook(usePostList, { tag: 'React' });
   assert.equal(hook.renders[0].isInitialLoading, true);
   assert.equal(hook.renders[0].isLoading, true);
-  assert.deepEqual(requests[0].params, { tag: 'React' });
+  assert.deepEqual(requests[0].params, { tag: 'React', limit: 20, offset: 0 });
   await hook.rerender({ tag: 'changed' });
   assert.equal(requests.length, 1);
   await act(async () => requests[0].resolve([]));
@@ -108,7 +108,7 @@ test('검색은 오래된 성공/오류를 무시하고 재조회는 마지막 �
   await act(async () => { void hook.current.search({ title: ' latest ', tag: '   ' }); });
   assert.equal(hook.current.status, 'searching');
   assert.equal(hook.current.isInitialLoading, false);
-  assert.deepEqual(hook.current.filters, { title: 'latest', tag: undefined });
+  assert.deepEqual(hook.current.filters, { title: 'latest', tag: undefined, sort: undefined, limit: undefined, offset: 0 });
   await act(async () => requests[0].resolve([{ id: 1 }]));
   await act(async () => requests[1].reject(new Error('stale error')));
   assert.equal(hook.current.isLoading, true);
@@ -122,7 +122,7 @@ test('검색은 오래된 성공/오류를 무시하고 재조회는 마지막 �
   await act(async () => { refresh = hook.current.refresh(); });
   assert.equal(hook.current.status, 'refreshing');
   assert.equal(hook.current.error, null);
-  assert.deepEqual(requests[3].params, { title: 'latest', tag: undefined });
+  assert.deepEqual(requests[3].params, { title: 'latest', tag: undefined, sort: undefined, limit: 20, offset: 0 });
   await act(async () => {
     requests[3].resolve([{ id: 3 }]);
     await refresh;
@@ -202,3 +202,25 @@ for (const [name, useHook, props, data] of [
     assert.equal(hook.current.isLoading, false);
   });
 }
+
+
+test('말머리 필터로 첫 페이지가 비어도 다음 페이지를 조회하며 검색 후 이전 추가 응답을 무시한다', async () => {
+  const hook = await renderHook(() => usePostList({}, '자유'));
+  const firstPage = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, hashtags: [{ id: 1, name: '질문' }] }));
+  await act(async () => requests[0].resolve(firstPage));
+  assert.deepEqual(hook.current.posts, []); assert.equal(hook.current.hasMore, true);
+  await act(async () => { void hook.current.loadMore(); void hook.current.loadMore(); });
+  assert.equal(requests.length, 2); assert.equal(requests[1].params.offset, 20);
+  const free = { id: 21, hashtags: [] };
+  await act(async () => requests[1].resolve([free]));
+  assert.deepEqual(hook.current.posts, [free]); assert.equal(hook.current.hasMore, false);
+  await act(async () => { void hook.current.search({ title: '갱신', limit: 2 }); });
+  assert.equal(requests[2].params.limit, 2);
+  await act(async () => requests[2].resolve([{ id: 30, hashtags: [] }, { id: 31, hashtags: [] }]));
+  await act(async () => { void hook.current.loadMore(); });
+  assert.equal(requests[3].params.offset, 2);
+  await act(async () => { void hook.current.search({ title: '새 검색' }); });
+  await act(async () => requests[4].resolve([{ id: 40, hashtags: [] }]));
+  await act(async () => requests[3].resolve([{ id: 32, hashtags: [] }]));
+  assert.deepEqual(hook.current.posts.map((item) => item.id), [40]);
+});

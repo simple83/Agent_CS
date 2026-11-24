@@ -1,4 +1,20 @@
-/** 화면과 Mock DB가 사용하는 평면 댓글이다. 서버의 replies 중첩은 서비스에서 정리한다. */
+/** 확정 API의 댓글 응답이다. 삭제된 본문은 null이고 답글은 부모 replies에 포함된다. */
+export interface CommentResponse {
+  id: number;
+  post_id: number;
+  author_id: number;
+  author_account_id: string;
+  author_username: string;
+  author_image_url: string | null;
+  content: string | null;
+  parent_comment_id: number | null;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+  replies: CommentResponse[];
+}
+
+/** 화면과 기존 Mock DB의 내부 모델이다. API 필드 이름은 서비스 경계에서 이 구조로 변환한다. */
 export interface CommentEntity {
   id: number;
   post_id: number;

@@ -109,3 +109,6 @@
   font-family: var(--mono);
   font-size: 15px;
 }
+
+/* 본문 이미지는 편집/상세 양쪽에서 컨테이너 폭을 넘지 않도록 표시한다. */
+.body img { max-width: 100%; height: auto; vertical-align: middle; }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { lazy, Suspense, type FormEvent } from 'react';
 import { usePostForm } from '../../hooks/usePostForm';
 import type { PostEntity } from '../../types/post.types';
 import { POST_CATEGORIES, isPostCategory, type PostCategory } from '../../utils/postEditor';
@@ -23,33 +23,21 @@ interface PostFormProps {
 }
 
 /**
- * 작성과 수정이 공유하는 제목·말머리·본문 폼이다. 수정에서는 기존 이미지를 읽기 전용으로 보여준다.
- * 시각적 편집기가 변환한 Markdown을 기존 Hook에 넘기므로 API 계약은 바뀌지 않는다.
+ * 작성과 수정이 공유하는 제목·말머리·본문 폼이다. 수정에서도 본문 이미지 위치와 기존 이미지 ID를 보존한다.
+ * 시각적 편집기가 변환한 Markdown을 기존 Hook에 넘기므로 서비스에서 이미지 임시 참조와 파일을 함께 전송한다.
  * 코드는 본문에서 바로 편집하므로 별도 코드 초안이나 삽입 대기 상태가 필요 없다.
  */
 export const PostForm = ({ onCreated, initialCategory, initialPost, onUpdated, onCancel }: PostFormProps) => {
   const isEditing = Boolean(initialPost);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const {
-    title, content, category, hashtagInput, hashtags, images, isLoading, error,
-    setTitle, setContent, setCategory, setHashtagInput, setImages, submit,
+    title, content, category, hashtagInput, hashtags, addImages, isLoading, error,
+    setTitle, setContent, setCategory, setHashtagInput, submit,
   } = usePostForm({ onCreated, initialCategory, initialPost, onUpdated });
 
   /** 기본 페이지 전송을 막고 Hook의 저장 흐름으로 전달한다. 성공할 때만 파일 입력을 비운다. */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const createdPost = await submit();
-    if (createdPost && fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  /**
-   * 여러 번 선택한 파일을 누적한다. 입력 값을 비워 같은 파일도 다시 고를 수 있게 한다.
-   * accept는 선택 편의 기능이며 실제 형식/용량/권한 검사는 서버가 담당해야 한다.
-   */
-  const handleImageChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(event.target.files ?? []);
-    setImages((previous) => [...previous, ...selectedFiles]);
-    event.target.value = '';
+    await submit();
   };
 
   return (
@@ -74,33 +62,10 @@ export const PostForm = ({ onCreated, initialCategory, initialPost, onUpdated, o
       </div>
 
       <Suspense fallback={<p role="status">본문 편집기를 준비하고 있습니다...</p>}>
-        <PostEditor content={content} onChange={setContent} disabled={isLoading} imageAttachmentAvailable={!isEditing} />
+        <PostEditor content={content} onChange={setContent} disabled={isLoading} onImageFiles={addImages} />
       </Suspense>
 
-      {/* 수정 시 파일 선택을 제공하지 않으며 기존 URL을 File로 바꾸거나 재전송하지 않는다. */}
-      {initialPost ? <section className={styles.attachments} aria-label="기존 첨부 이미지">
-        <span className={ui.field}>기존 첨부 이미지</span>
-        <p className={ui.help}>기존 이미지는 그대로 유지됩니다. 수정 화면에서 이미지 추가·교체·삭제는 아직 지원하지 않습니다.</p>
-        {initialPost.image_urls.length ? <div className={styles.existingImages}>
-          {initialPost.image_urls.map((url, index) => <img key={`${index}-${url}`} src={url}
-            alt={`기존 첨부 이미지 ${index + 1}`} className={styles.existingImage} />)}
-        </div> : <p className={ui.help}>첨부된 이미지가 없습니다.</p>}
-      </section> :
-      /* 새 글의 첨부는 기존 multipart images 필드로 전송한다. */
-      <section className={styles.attachments} aria-label="이미지 첨부">
-        <label className={ui.field} htmlFor="post-images">이미지 첨부</label>
-        <p className={ui.help}>첨부 이미지는 본문 위에 모아서 표시됩니다. 본문 중간 삽입은 아직 지원하지 않습니다.</p>
-        <input className={styles.fileInput} id="post-images" ref={fileInputRef} type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp" multiple disabled={isLoading}
-          onChange={handleImageChange} />
-        {images.length > 0 && <ul className={styles.attachmentList}>
-          {images.map((file, index) => <li key={`${index}-${file.name}`}>
-            <span>{file.name} · {Math.ceil(file.size / 1024)}KB</span>
-            <button className={ui.button} type="button" disabled={isLoading} aria-label={`${file.name} 첨부 제거`}
-              onClick={() => setImages(images.filter((_, position) => position !== index))}>제거</button>
-          </li>)}
-        </ul>}
-      </section>}
+      <p className={ui.help}>도구 모음의 이미지 버튼으로 커서 위치에 삽입합니다. 본문에서 이미지를 삭제하면 저장할 때 반영됩니다. 새 이미지는 요청당 최대 10개입니다.</p>
 
       <label className={ui.field}>주제 태그
         <input className={ui.input} value={hashtagInput} onChange={(event) => setHashtagInput(event.target.value)}

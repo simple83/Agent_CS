@@ -1,4 +1,5 @@
-import { Extension, type Command, type Editor } from '@tiptap/core';
+import { imageMarkdown, isImageUrl } from './markdownImages';
+import { Node as TiptapNode, Extension, type Command, type Editor } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import { closeHistory } from '@tiptap/pm/history';
 import StarterKit from '@tiptap/starter-kit';
@@ -118,8 +119,39 @@ const commentMarkdownReaders = [
 ];
 
 /**
- * 상세 렌더러가 지원하는 Markdown 서식만 활성화한다. 이미지 노드는 등록하지 않아
- * 기존 첨부 API와 본문 편집을 섞지 않는다. 댓글은 일반 문단과 코드블록만 제공하며,
+ * 본문 이미지 노드. 서버 Markdown과 명시적 파일 선택만 허용하고 HTML 붙여넣기의 img는 읽지 않는다.
+ * 댓글 스키마에는 등록하지 않으므로 게시글의 이미지 기능이 댓글로 확장되지 않는다.
+ */
+const PostImageNode = TiptapNode.create({
+  name: 'image', inline: true, group: 'inline', atom: true, draggable: false,
+  addAttributes: () => ({ src: { default: '' }, alt: { default: '' } }),
+  parseHTML: () => [],
+  renderHTML: ({ HTMLAttributes }) => ['img', {
+    src: isImageUrl(HTMLAttributes.src, true) ? HTMLAttributes.src : undefined,
+    alt: HTMLAttributes.alt, referrerpolicy: 'no-referrer',
+  }],
+  markdownTokenName: 'image',
+  parseMarkdown: (token) => isImageUrl(String(token.href ?? ''), true)
+    ? { type: 'image', attrs: { src: token.href, alt: token.text ?? '' } }
+    : { type: 'text', text: String(token.text || '이미지 주소를 확인해주세요.') },
+});
+
+/**
+ * 기본 문단 파서는 이미지 하나만 있으면 블록 이미지로 간주하고 문단을 없앤다.
+ * 여기서는 문장 사이에도 삽입하는 인라인 이미지이므로 문단을 유지해야 위치·줄바꿈이 보존된다.
+ * 나머지 문단은 기본 파서에 맡겨 빈 문단 표시 등 기존 규칙을 그대로 사용한다.
+ */
+const InlineImageParagraph = Extension.create({
+  name: 'inlineImageParagraph',
+  priority: 1100,
+  markdownTokenName: 'paragraph',
+  parseMarkdown: (token, helpers) => token.tokens?.length === 1 && token.tokens[0].type === 'image'
+    ? helpers.createNode('paragraph', undefined, helpers.parseInline(token.tokens))
+    : [],
+});
+
+/**
+ * 상세 렌더러가 지원하는 Markdown 서식만 활성화한다. 이미지는 게시글에만 등록한다. 댓글은 일반 문단과 코드블록만 제공하며,
  * 버튼 숨김뿐 아니라 다른 서식의 단축키·입력 규칙·붙여넣기 서식도 비활성화한다.
  * 실행 취소 이력은 기본 텍스트 편집을 위해 유지하되 댓글 도구 모음에는 노출하지 않는다.
  */
@@ -153,7 +185,7 @@ export const createVisualEditorExtensions = (variant: 'post' | 'comment' = 'post
     },
     defaultLanguage: 'text',
   }),
-  ...(variant === 'comment' ? commentMarkdownReaders : []),
+  ...(variant === 'comment' ? commentMarkdownReaders : [PostImageNode, InlineImageParagraph]),
   Markdown.configure({ markedOptions: { gfm: false } }),
 ];
 
@@ -170,6 +202,7 @@ const inlineCodeEdge = (text: string, side: 'open' | 'close'): string => {
  * 알 수 없는 노드는 조용히 버리지 않고 오류로 알리는 기본 strict 설정을 유지한다.
  */
 const serializer = new MarkdownSerializer({
+  image(state, node) { state.write(imageMarkdown(node.attrs.alt ?? '', node.attrs.src)); },
   paragraph(state, node) {
     // 공백 엔티티로 빈 문단을 보존한다. 실제 공백은 API 전송 전 trim()에서 사라질 수 있다.
     if (node.content.size === 0) state.write('&nbsp;');
@@ -210,5 +243,8 @@ const serializer = new MarkdownSerializer({
 }, { hardBreakNodeName: 'hardBreak' });
 
 /** 공백만 있는 문서는 빈 문자열로 보내 기존 필수 본문 검증을 그대로 사용한다. */
-export const serializeVisualEditor = (editor: Editor): string =>
-  editor.state.doc.textContent.trim() ? serializer.serialize(editor.state.doc) : '';
+export const serializeVisualEditor = (editor: Editor): string => {
+  let hasImage = false;
+  editor.state.doc.descendants((node) => { if (node.type.name === 'image') hasImage = true; });
+  return editor.state.doc.textContent.trim() || hasImage ? serializer.serialize(editor.state.doc) : '';
+};

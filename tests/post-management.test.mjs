@@ -12,6 +12,12 @@ for (const name of ['window', 'document', 'Node', 'HTMLElement', 'MutationObserv
   globalThis[name] = name === 'window' ? dom.window : dom.window[name];
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+// 파일 선택 뒤 포커스를 복원하는 편집기 예약 작업을 가상 DOM에서도 실행한다.
+globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+globalThis.cancelAnimationFrame = clearTimeout;
+// jsdom은 레이아웃 계산을 제공하지 않는다. 포커스 스크롤만 빈 영역으로 대체한다.
+dom.window.Range.prototype.getClientRects = () => [];
+dom.window.Range.prototype.getBoundingClientRect = () => new dom.window.DOMRect();
 const server = await createServer({ configFile: false, mode: 'mock',
   server: { middlewareMode: true, watch: null, hmr: false, ws: false },
   optimizeDeps: { noDiscovery: true, include: [] },
@@ -128,7 +134,7 @@ test('수정 초안은 부모 재조회와 저장 실패 후에도 보존하며 
   postApi.updatePost = async (id, params) => {
     assert.equal(id, post.id);
     assert.equal(Object.hasOwn(params, 'images'), false);
-    assert.equal(Object.hasOwn(params, 'hashtags'), false);
+    assert.equal(params.hashtags === undefined, true);
     return { ...post, ...params };
   };
   await act(async () => { await form.submit(); });
@@ -178,22 +184,23 @@ test('직접 연 수정 화면은 실제 편집기를 채우고 원본 코드·�
   await login();
   const db = readMockDatabase();
   db.posts[0].content = '\n설명\n\n```cpp\n  int n = 1;\n```\n\n뒤 문단\n\n';
-  db.posts[0].image_urls = ['data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jK1sAAAAASUVORK5CYII='];
+  db.posts[0].images = [{ id: 10, image_url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jK1sAAAAASUVORK5CYII=' }];
+  db.posts[0].content += `![사진](${db.posts[0].images[0].image_url})`;
   saveMockDatabase(db);
   const before = await postApi.getPost(1);
   const mounted = await mountRoute('/posts/1/edit');
   await waitFor(() => mounted.container.querySelector('[role=textbox]'));
   assert.equal(mounted.container.querySelector('input').value, before.title);
   assert.ok(mounted.container.querySelector('pre code'));
-  assert.equal(mounted.container.querySelector('input[type=file]'), null);
-  assert.equal(mounted.container.querySelector('img').src, before.image_urls[0]);
+  assert.ok(mounted.container.querySelector('input[type=file]'));
+  assert.equal(mounted.container.querySelector('[role=textbox] img[src]').src, before.images[0].image_url);
   await act(async () => button(mounted.container, '수정 저장').click());
   await waitFor(() => mounted.container.querySelector('output').textContent === '/posts/1');
   await waitFor(() => button(mounted.container, '좋아요')?.disabled === false);
   const afterPost = await postApi.getPost(1);
   assert.equal(afterPost.content, before.content);
   assert.deepEqual(afterPost.hashtags, before.hashtags);
-  assert.deepEqual(afterPost.image_urls, before.image_urls);
+  assert.deepEqual(afterPost.images, before.images);
   await waitFor(() => button(mounted.container, '수정'));
 });
 
@@ -284,4 +291,42 @@ test('삭제 Hook은 다른 계정의 요청과 언마운트 후 이동을 차�
   await mounted.unmount();
   await act(async () => { finish({ detail: '삭제' }); await pending; });
   assert.equal(moved, false);
+});
+
+
+test('수정 화면의 이미지 버튼으로 본문 사이에 추가하고 재편집에서 제거하면 첨부 ID도 삭제한다', async () => {
+  await login();
+  const db = readMockDatabase();
+  db.posts[0].content = '앞 문단\n\n뒤 문단';
+  saveMockDatabase(db);
+  const mounted = await mountRoute('/posts/1/edit');
+  await waitFor(() => mounted.container.querySelector('[role=textbox]')?.editor);
+  const editor = mounted.container.querySelector('[role=textbox]').editor;
+  await act(async () => editor.commands.setTextSelection(5));
+  const input = mounted.container.querySelector('input[type=file]');
+  const file = new File(['png'], '사진.png', { type: 'image/png' });
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () => input.dispatchEvent(new window.Event('change', { bubbles: true })));
+  await waitFor(() => mounted.container.querySelector('[role=textbox] img[src]'));
+  await act(async () => button(mounted.container, '수정 저장').click());
+  await waitFor(() => mounted.container.querySelector('output').textContent === '/posts/1');
+  let saved;
+  await act(async () => { saved = await postApi.getPost(1); });
+  assert.equal(saved.images.length, 1);
+  assert.ok(saved.content.indexOf('앞 문단') < saved.content.indexOf('data:image/'));
+  assert.ok(saved.content.indexOf('data:image/') < saved.content.indexOf('뒤 문단'));
+  assert.equal(saved.content.includes('blob:'), false);
+  await mounted.unmount();
+  const editing = await mountRoute('/posts/1/edit');
+  await waitFor(() => editing.container.querySelector('[role=textbox]')?.editor);
+  const nextEditor = editing.container.querySelector('[role=textbox]').editor;
+  let imagePosition;
+  nextEditor.state.doc.descendants((node, pos) => { if (node.type.name === 'image') imagePosition = pos; });
+  await act(async () => nextEditor.commands.deleteRange({ from: imagePosition, to: imagePosition + 1 }));
+  await act(async () => button(editing.container, '수정 저장').click());
+  await waitFor(() => editing.container.querySelector('output').textContent === '/posts/1');
+  let removed;
+  await act(async () => { removed = await postApi.getPost(1); });
+  assert.deepEqual(removed.images, []);
+  assert.ok(removed.content.includes('앞 문단') && removed.content.includes('뒤 문단'));
 });

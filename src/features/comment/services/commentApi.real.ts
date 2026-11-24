@@ -1,7 +1,8 @@
+import { apiFetch } from '../../../shared/services/apiFetch';
 import { realApiUrl } from '../../../shared/config/apiMode';
 import { authStorage } from '../../../shared/services/authStorage';
 import type { CommentApi } from '../types/comment.types';
-import { normalizeComments, validateCommentContent, validateCommentId } from '../utils/comments';
+import { normalizeCommentResponse, validateCommentContent, validateCommentId } from '../utils/comments';
 
 /** HTTP 상태를 보존해 인증/권한/삭제/입력 오류를 네트워크 오류와 구별한다. */
 export class CommentApiError extends Error {
@@ -25,7 +26,7 @@ const request = async (path: string, method = 'GET', content?: string): Promise<
     validateCommentContent(content);
     headers['Content-Type'] = 'application/json';
   }
-  const response = await fetch(realApiUrl(path), { method, headers,
+  const response = await apiFetch(realApiUrl(path), { method, headers,
     ...(content === undefined ? {} : { body: JSON.stringify({ content }) }) });
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -42,7 +43,7 @@ const request = async (path: string, method = 'GET', content?: string): Promise<
   return data;
 };
 
-/** API base URL에 /api가 포함되어 있으면 여기서 중복하지 않는다. 명세의 PATCH 예외 표기는 별도 확인 대상이다. */
+/** API base URL에 /api가 포함되어 있으면 여기서 중복하지 않는다. 확정 명세의 댓글 경로는 모두 /posts로 시작한다. */
 const pathFor = (postId: number, commentId?: number) => {
   validateCommentId(postId);
   if (commentId !== undefined) validateCommentId(commentId);
@@ -52,14 +53,14 @@ const pathFor = (postId: number, commentId?: number) => {
 /** 정상 단건 응답도 목록과 같은 형식·게시글 소속 검증을 거친다. */
 const mutation = async (postId: number, path: string, method: string, content: string) => {
   const data = await request(path, method, content);
-  const comments = normalizeComments([data], postId);
+  const comments = normalizeCommentResponse([data], postId, true);
   const id = (data as { id: number }).id;
   return comments.find((comment) => comment.id === id)!;
 };
 
 /** 실제 댓글 API 계약이다. 댓글 내용은 Markdown 문자열이며 서버 실행을 요청하는 API는 없다. */
 export const realCommentApi: CommentApi = {
-  getComments: async (postId) => normalizeComments(await request(pathFor(postId)), postId),
+  getComments: async (postId) => normalizeCommentResponse(await request(pathFor(postId)), postId),
   createComment: (postId, content) => mutation(postId, pathFor(postId), 'POST', content),
   createReply: (postId, parentId, content) => mutation(postId, `${pathFor(postId, parentId)}/replies`, 'POST', content),
   updateComment: (postId, id, content) => mutation(postId, pathFor(postId, id), 'PATCH', content),

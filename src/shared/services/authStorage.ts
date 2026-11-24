@@ -39,11 +39,14 @@ export const authStorage = {
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', onChange);
     document.addEventListener('visibilitychange', onVisible);
+    // 화면을 그대로 둔 동안의 JWT/Mock 만료도 반영한다. 서버의 최종 권한 검사를 대신하지 않는다.
+    const timer = window.setInterval(onChange, 30000);
     return () => {
       window.removeEventListener(changeEvent, onChange);
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', onChange);
       document.removeEventListener('visibilitychange', onVisible);
+      window.clearInterval(timer);
     };
   },
 
@@ -54,6 +57,23 @@ export const authStorage = {
   },
   /** 보호된 API의 Authorization 헤더에 넣을 액세스 토큰을 읽는다. 없으면 null이다. */
   getAccessToken: () => readToken('access_token'),
+  /** JWT exp는 메뉴 표시용 힌트다. 서명 검증과 단일 세션 무효화 여부는 서버가 판단한다. */
+  hasActiveAccessToken() {
+    const token = readToken('access_token');
+    if (!token) return false;
+    if (token.split('.').length !== 3) return true;
+    try {
+      const encoded = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '=')));
+      return typeof payload.exp === 'number' && Number.isFinite(payload.exp) && payload.exp * 1000 > Date.now();
+    } catch { return false; }
+  },
+  /** 이전 요청의 401이 새 로그인 세션을 지우지 않도록 요청에 사용한 토큰을 대조한다. */
+  expireAccessToken(token: string) {
+    if (readToken('access_token') !== token) return;
+    localStorage.removeItem(`${prefix}access_token`);
+    notifyChange();
+  },
   /** 갱신/로그아웃 요청에 사용할 리프레시 토큰을 읽는다. */
   getRefreshToken: () => readToken('refresh_token'),
   /** 로그인 응답의 토큰과 사용자 식별자를 문자열로 저장한다. */
@@ -61,10 +81,9 @@ export const authStorage = {
     for (const key of keys) localStorage.setItem(`${prefix}${key}`, String(data[key]));
     notifyChange();
   },
-  /** 토큰 갱신 시 사용자 식별자는 그대로 두고 토큰만 교체한다. */
+  /** 서버는 액세스 토큰만 재발급한다. 기존 갱신 토큰과 사용자 식별자는 보존한다. */
   saveTokens(data: RefreshResponse) {
     localStorage.setItem(`${prefix}access_token`, data.access_token);
-    localStorage.setItem(`${prefix}refresh_token`, data.refresh_token);
     notifyChange();
   },
   /** 현재 모드의 인증 키만 지운다. 게시글과 다른 모드의 로그인 정보는 남긴다. */

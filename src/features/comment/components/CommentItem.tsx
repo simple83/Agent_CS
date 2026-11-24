@@ -22,11 +22,10 @@ export const CommentItem = ({ comment, userId, postAuthorId, busy, onReply, onUp
   const hidden = comment.is_deleted || comment.is_blurred;
   const owned = userId === comment.user_id;
 
-  /** 삭제 여부는 서버 성공 후에만 목록에 반영한다. 현재 API가 대댓글까지 삭제함을 반드시 고지한다. */
+  /** 삭제 여부는 서버 성공 후에만 목록에 반영한다. 부모가 삭제되어도 기존 답글은 남는다. */
   const remove = async () => {
-    // TODO(backend-reply-preservation): 부모 자리와 답글을 보존하는 API 합의 후 문구/연쇄 삭제를 함께 변경한다.
     const warning = comment.parent_comment_id === null
-      ? '이 댓글과 아래 답글이 함께 삭제됩니다. 다른 사람이 작성한 답글도 삭제될 수 있습니다. 삭제하시겠습니까?'
+      ? '이 댓글을 삭제하시겠습니까? 기존 답글은 유지됩니다.'
       : '이 답글을 삭제하시겠습니까?';
     if (busy || !window.confirm(warning)) return;
     setError(null);

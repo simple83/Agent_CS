@@ -1,12 +1,13 @@
 import type { CommentEntity } from '../types/comment.types';
 
-// TODO(backend-contract): 서버와 최대 길이 및 계산 단위를 합의한다. 현재는 프론트·Mock의 임시 보호 한도다.
-export const COMMENT_MAX_LENGTH = 10000;
+// Pydantic 문자열 길이와 맞춰 유니코드 코드 포인트로 센다. 코드 서식 문자도 길이에 포함한다.
+export const COMMENT_MAX_LENGTH = 5000;
+export const commentLength = (content: string) => Array.from(content).length;
 
 /** 공백뿐인 내용과 지나치게 긴 입력을 요청 전에 거부한다. 코드의 들여쓰기는 변경하지 않는다. */
 export const validateCommentContent = (content: string) => {
   if (!content.trim()) throw new Error('댓글 내용을 입력해주세요.');
-  if (content.length > COMMENT_MAX_LENGTH) throw new Error(`댓글은 ${COMMENT_MAX_LENGTH.toLocaleString()}자 이내로 입력해주세요.`);
+  if (commentLength(content) > COMMENT_MAX_LENGTH) throw new Error(`댓글은 ${COMMENT_MAX_LENGTH.toLocaleString()}자 이내로 입력해주세요.`);
 };
 
 /** URL에 들어가는 식별자는 양의 안전한 정수만 허용한다. */
@@ -15,8 +16,34 @@ export const validateCommentId = (value: number) => {
 };
 
 /**
+ * 확정 응답을 내부 모델로 변환한다. 삭제된 null 본문만 빈 문자열로 바꾸고 정상 댓글의 누락은 거부한다.
+ * 반복문과 개수 제한으로 비정상적으로 깊은 replies가 호출 스택을 소진하지 않게 한다.
+ */
+export const normalizeCommentResponse = (input: unknown, postId: number, single = false): CommentEntity[] => {
+  if (!Array.isArray(input)) throw new Error('댓글 목록 응답 형식이 올바르지 않습니다.');
+  // 작성/수정의 단건 응답은 대댓글 자체일 수 있다. 목록 응답에서는 최상위 부모가 null이어야 한다.
+  const pending = input.map((value: unknown) => ({ value, parent: single && value && typeof value === 'object'
+    ? (value as { parent_comment_id: number | null }).parent_comment_id : null }));
+  const flat: unknown[] = [];
+  while (pending.length) {
+    if (flat.length >= 10000) throw new Error('댓글 응답이 너무 큽니다.');
+    const { value, parent } = pending.pop()!;
+    if (!value || typeof value !== 'object') throw new Error('댓글 응답 형식이 올바르지 않습니다.');
+    const item = value as Record<string, unknown>;
+    if (item.parent_comment_id !== parent || !Array.isArray(item.replies)) throw new Error('댓글의 부모 정보가 일치하지 않습니다.');
+    flat.push({ ...item, user_id: item.author_id, username: item.author_username,
+      account_id: item.author_account_id, profile_image_url: item.author_image_url,
+      content: item.is_deleted === true && item.content === null ? '' : item.content,
+      is_blurred: false, report_count: 0, replies: [] });
+    if (parent !== null && item.replies.length) throw new Error('대댓글은 최대 2단계입니다.');
+    for (const reply of item.replies) pending.push({ value: reply, parent: item.id as number });
+  }
+  return normalizeComments(flat, postId);
+};
+
+/**
  * 평면/중첩 응답을 ID 기준으로 합치고 다른 게시글의 데이터·순환 관계·상충하는 중복을 거부한다.
- * TODO(backend-contract): 실제 대댓글 포함 응답을 확인하면 서버 응답 타입을 확정한다.
+ * HTTP 응답은 normalizeCommentResponse에서 변환하며 이 함수는 내부 모델과 기존 Mock 저장소에 사용한다.
  * 삭제/블라인드 본문은 화면 상태에 보관하기 전에 비운다. 서버 역시 원문을 제거해 반환해야 한다.
  */
 export const normalizeComments = (input: unknown, postId: number): CommentEntity[] => {
@@ -79,20 +106,4 @@ export const groupComments = (comments: CommentEntity[]) => {
     groups.set(root.id, group);
   }
   return [...groups.values()].filter(({ root, replies }) => !root.is_deleted || replies.some((reply) => !reply.is_deleted));
-};
-
-/** 현재 계약의 연쇄 삭제 대상 ID를 계산한다. 삭제 범위 판단은 서버가 최종 수행한다. */
-export const getCommentSubtreeIds = (comments: CommentEntity[], id: number): Set<number> => {
-  const removed = new Set([id]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const comment of comments) {
-      if (comment.parent_comment_id !== null && removed.has(comment.parent_comment_id) && !removed.has(comment.id)) {
-        removed.add(comment.id);
-        changed = true;
-      }
-    }
-  }
-  return removed;
 };

@@ -1,3 +1,4 @@
+import { imageMarkdown } from '../components/richText/markdownImages';
 import { MOCK_POSTS } from '../../features/post/mocks/mockPosts';
 import type { PostEntity } from '../../features/post/types/post.types';
 import type { CommentEntity } from '../../features/comment/types/comment.types';
@@ -90,6 +91,19 @@ export const readMockDatabase = (): MockDatabase => {
       || !data.likes || typeof data.likes !== 'object' || Array.isArray(data.likes)) {
       throw new Error('Invalid mock database');
     }
+    // 구버전의 상단 첨부를 본문 끝에 옮겨 이미지 위치 계약으로 이행한다. 글/댓글/세션은 초기화하지 않는다.
+    let migrated = false;
+    let imageId = Math.max(0, ...data.posts.flatMap((post) => (post.images ?? []).map((image) => image.id))) + 1;
+    for (const post of data.posts) {
+      const legacy = post as PostEntity & { image_urls?: string[] };
+      if (!Array.isArray(post.images)) {
+        post.images = (legacy.image_urls ?? []).map((url) => ({ id: imageId++, image_url: url }));
+        if (post.images.length) post.content += '\n\n' + post.images.map((image) => imageMarkdown('첨부 이미지', image.image_url)).join('\n\n');
+        delete legacy.image_urls;
+        migrated = true;
+      }
+    }
+    if (migrated) saveMockDatabase(data);
     // 기존 v1 저장소는 댓글이 없었다. 사용자가 만든 글/첨부/세션을 지우지 않고 필드만 추가한다.
     // 과거 comment_count는 예시 숫자였으므로 존재하지 않는 댓글을 생성하지 않고 0으로 맞춘다.
     if (data.comments === undefined) {

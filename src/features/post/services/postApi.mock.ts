@@ -1,3 +1,5 @@
+import { imageReferences, mapMarkdownImages } from '../../../shared/components/richText/markdownImages';
+import { normalizeTags, parsePostSummary, validatePostInput, validatePostQuery } from '../utils/postContract';
 import type { PostApi } from '../types/postApi.types';
 import type { Hashtag, PostEntity } from '../types/post.types';
 import {
@@ -21,17 +23,12 @@ const findOwnedPost = (data: MockDatabase, postId: number) => {
   return post;
 };
 
-/** 태그 이름의 공백/#과 중복을 정리한다. 기존 이름의 ID는 재사용하고 새 이름에만 ID를 부여한다. */
+/** 태그 이름의 공백과 대소문자·중복을 정리한다. 기존 이름의 ID는 재사용하고 새 이름에만 ID를 부여한다. */
 const makeHashtags = (data: MockDatabase, names: string[]): Hashtag[] => {
   const known = new Map(data.posts.flatMap((post) => post.hashtags).map((tag) => [tag.name, tag]));
   let nextId = Math.max(0, ...[...known.values()].map((tag) => tag.id)) + 1;
-  const unique = [...new Set(names.map((name) => name.trim().replace(/^#/, '')).filter(Boolean))];
+  const unique = normalizeTags(names);
   return unique.map((name) => known.get(name) ?? { id: nextId++, name });
-};
-
-/** 서비스 직접 호출에서도 공백뿐인 제목/본문을 거부한다. 원문 자체를 변형하지는 않는다. */
-const validateText = (value: string) => {
-  if (!value.trim()) throw new Error('제목과 내용을 모두 입력해주세요.');
 };
 
 /**
@@ -55,18 +52,34 @@ const readImages = async (images: File[] = []): Promise<string[]> => {
   }));
 };
 
+/** 요청 중 계정 전환을 감지한다. HTTP 요청이 시작 시점 토큰을 사용하는 것과 같은 경계를 둔다. */
+const assertSession = (token: string | null) => {
+  if (!token || authStorage.getAccessToken() !== token) throw new Error('로그인 상태가 변경되었습니다. 다시 시도해주세요.');
+};
+
+/** 지연 도중 로그인 상태가 바뀌면 다른 계정으로 이전 요청을 실행하지 않는다. */
+const waitForMutation = async () => {
+  const token = authStorage.getAccessToken();
+  await waitForMockRequest();
+  assertSession(token);
+  return token;
+};
+
 /** 실제 API와 같은 인터페이스로 로컬 DB를 조작한다. 지연/실패를 먼저 처리한 뒤 데이터를 변경한다. */
 export const mockPostApi: PostApi = {
   /** 삭제 글을 제외하고 제목 부분 일치/태그 이름 일치를 교집합으로 적용한 뒤 최신순으로 반환한다. */
-  async getPosts({ title, tag } = {}) {
+  async getPosts(params = {}) {
+    validatePostQuery(params);
+    const { title, tag, sort = 'created_at', limit = 20, offset = 0 } = params;
     await waitForMockRequest();
     const titleQuery = title?.trim().toLocaleLowerCase();
-    const tagQuery = tag?.trim().replace(/^#/, '').toLocaleLowerCase();
+    const tagQuery = tag?.trim().toLocaleLowerCase();
     return readMockDatabase().posts
       .filter((post) => !post.is_deleted
         && (!titleQuery || post.title.toLocaleLowerCase().includes(titleQuery))
         && (!tagQuery || post.hashtags.some((item) => item.name.toLocaleLowerCase() === tagQuery)))
-      .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id - a.id);
+      .sort((a, b) => (sort === 'view_count' ? b.view_count - a.view_count : 0) || b.created_at.localeCompare(a.created_at) || b.id - a.id)
+      .slice(offset, offset + limit).map(parsePostSummary);
   },
   /** 상세 조회마다 조회수를 증가시켜 저장하고, 호출자가 DB 객체를 바꾸지 못하도록 복사해 반환한다. */
   async getPost(postId) {
@@ -79,45 +92,63 @@ export const mockPostApi: PostApi = {
   },
   /** 인증·필수값·이미지를 검증하고 새 글을 저장한다. 이미지 처리 중 실패하면 게시글을 추가하지 않는다. */
   async createPost(params) {
-    await waitForMockRequest();
+    const token = await waitForMutation();
     requireMockUser(readMockDatabase());
-    validateText(params.title);
-    validateText(params.content);
-    const images = await readImages(params.images);
+    validatePostInput(params);
+    if (imageReferences(params.content).some((url) => url.startsWith('s3://'))) throw new Error('새 글에는 내부 이미지 참조를 사용할 수 없습니다.');
+    const urls = await readImages(params.images);
+    assertSession(token);
     // 비동기 이미지 변환 사이에 발생한 쓰기를 보존하려고 DB와 인증 정보를 다시 읽는다.
     const data = readMockDatabase();
     const user = requireMockUser(data);
+    let imageId = Math.max(0, ...data.posts.flatMap((item) => item.images.map((image) => image.id))) + 1;
+    const images = urls.map((url) => ({ id: imageId, image_url: `${url}#mock-image-${imageId++}` }));
+    const content = mapMarkdownImages(params.content, (url) => {
+      const index = params.image_ids?.indexOf(url.slice(9)) ?? -1;
+      return url.startsWith('upload://') && index >= 0 ? images[index].image_url : url;
+    });
     const now = new Date().toISOString();
     const post: PostEntity = {
       id: Math.max(0, ...data.posts.map((item) => item.id)) + 1,
       title: params.title,
-      content: params.content,
-      image_urls: images,
+      content,
+      images,
       author_id: user.id,
       author_account_id: user.account_id,
       author_username: user.username,
-      author_image_url: '',
+      author_image_url: null,
       hashtags: makeHashtags(data, params.hashtags ?? []),
       like_count: 0, comment_count: 0, view_count: 0,
       created_at: now, updated_at: now,
-      is_blurred: false, is_deleted: false, report_count: 0,
+      is_deleted: false,
     };
     data.posts.push(post);
     saveMockDatabase(data);
     return structuredClone(post);
   },
-  /** 본인 글의 전달된 필드만 변경한다. undefined는 유지, 빈 배열은 첨부/태그 제거를 의미한다. */
+  /** 본문 참조/유지 ID를 검증한 후 한 번에 저장한다. 새 업로드는 기존 이미지 뒤에 추가한다. */
   async updatePost(postId, params) {
-    await waitForMockRequest();
+    const token = await waitForMutation();
     findOwnedPost(readMockDatabase(), postId);
-    if (params.title !== undefined) validateText(params.title);
-    if (params.content !== undefined) validateText(params.content);
-    const images = params.images === undefined ? undefined : await readImages(params.images);
+    validatePostInput(params);
+    const urls = await readImages(params.images);
+    assertSession(token);
     const data = readMockDatabase();
     const post = findOwnedPost(data, postId);
+    const kept = params.keep_image_ids ?? post.images.map((image) => image.id);
+    if (kept.some((id) => !post.images.some((image) => image.id === id))) throw new Error('해당 게시글의 이미지 ID만 유지할 수 있습니다.');
+    const content = params.content ?? post.content;
+    const references = new Set(imageReferences(content));
+    if (post.images.some((image) => !kept.includes(image.id) && references.has(image.image_url))) throw new Error('이미지 삭제 전 본문 참조도 제거해주세요.');
+    let imageId = Math.max(0, ...data.posts.flatMap((item) => item.images.map((image) => image.id))) + 1;
+    const added = urls.map((url) => ({ id: imageId, image_url: `${url}#mock-image-${imageId++}` }));
+    const nextContent = mapMarkdownImages(content, (url) => {
+      const index = params.image_ids?.indexOf(url.slice(9)) ?? -1;
+      return url.startsWith('upload://') && index >= 0 ? added[index].image_url : url;
+    });
     if (params.title !== undefined) post.title = params.title;
-    if (params.content !== undefined) post.content = params.content;
-    if (images !== undefined) post.image_urls = images;
+    post.content = nextContent;
+    post.images = [...post.images.filter((image) => kept.includes(image.id)), ...added];
     if (params.hashtags !== undefined) post.hashtags = makeHashtags(data, params.hashtags);
     post.updated_at = new Date().toISOString();
     saveMockDatabase(data);
@@ -125,7 +156,7 @@ export const mockPostApi: PostApi = {
   },
   /** 본인 글을 물리적으로 지우지 않고 삭제 표시하여 이후 목록/상세에서 제외한다. */
   async deletePost(postId) {
-    await waitForMockRequest();
+    await waitForMutation();
     const data = readMockDatabase();
     const post = findOwnedPost(data, postId);
     post.is_deleted = true;
@@ -144,7 +175,7 @@ export const mockPostApi: PostApi = {
   },
   /** 사용자별 좋아요 기록과 합계를 함께 갱신한다. 동일 사용자의 중복 등록은 오류로 처리한다. */
   async likePost(postId) {
-    await waitForMockRequest();
+    await waitForMutation();
     const data = readMockDatabase();
     const user = requireMockUser(data);
     const post = findPost(data, postId);
@@ -153,11 +184,11 @@ export const mockPostApi: PostApi = {
     data.likes[postId] = [...likes, user.id];
     post.like_count += 1;
     saveMockDatabase(data);
-    return { detail: '게시글 좋아요가 등록되었습니다.' };
+    return { post_id: postId, like_count: post.like_count, is_liked: true };
   },
   /** 현재 사용자가 추가한 좋아요만 취소한다. 예제 기본 좋아요 수는 개별 사용자 기록이 아니다. */
   async unlikePost(postId) {
-    await waitForMockRequest();
+    await waitForMutation();
     const data = readMockDatabase();
     const user = requireMockUser(data);
     const post = findPost(data, postId);
@@ -166,6 +197,6 @@ export const mockPostApi: PostApi = {
     data.likes[postId] = likes.filter((id) => id !== user.id);
     post.like_count = Math.max(0, post.like_count - 1);
     saveMockDatabase(data);
-    return { detail: '게시글 좋아요가 취소되었습니다.' };
+    return { post_id: postId, like_count: post.like_count, is_liked: false };
   },
 };

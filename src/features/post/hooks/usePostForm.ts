@@ -1,3 +1,5 @@
+import { imageReferences, mapMarkdownImages } from '../../../shared/components/richText/markdownImages';
+import { validatePostInput } from '../utils/postContract';
 import { useEffect, useRef, useState } from 'react';
 import { postApi } from '../services/postApi';
 import type { CreatePostParams, PostEntity, UpdatePostParams } from '../types/post.types';
@@ -27,7 +29,23 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
   const [title, setTitle] = useState(editingPost?.title ?? '');
   const [content, setContent] = useState(editingPost?.content ?? '');
   const [hashtagInput, setHashtagInput] = useState(() => editingPost ? getPostTopicInput(editingPost.hashtags) : '');
-  const [images, setImages] = useState<File[]>([]);
+  // 임시 미리보기 URL은 저장하지 않고 제출 직전에 upload:// ID로 바꾼다. 실행 취소를 위해 해제는 폼 종료 시 한다.
+  const pendingImages = useRef<{ id: string; file: File; url: string }[]>([]);
+
+  const releaseImages = () => {
+    for (const image of pendingImages.current) URL.revokeObjectURL(image.url);
+    pendingImages.current = [];
+  };
+
+  /** 본문에 실제로 남아 있는 새 이미지만 개수에 포함한다. 파일은 서버 전송까지 메모리에 보관한다. */
+  const addImages = (files: File[]) => {
+    const refs = new Set(imageReferences(content));
+    if (pendingImages.current.filter((image) => refs.has(image.url)).length + files.length > 10) throw new Error('새 이미지는 한 번에 10개까지 첨부할 수 있습니다.');
+    if (files.some((file) => !/^image\/(png|jpeg|gif|webp)$/.test(file.type))) throw new Error('PNG, JPEG, GIF, WebP 이미지를 선택해주세요.');
+    const added = files.map((file) => ({ id: crypto.randomUUID(), file, url: URL.createObjectURL(file) }));
+    pendingImages.current.push(...added);
+    return added.map((image) => ({ src: image.url, alt: image.file.name }));
+  };
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // state 갱신은 다음 렌더에 반영된다. ref는 같은 렌더 안의 연속 호출도 즉시 차단한다.
@@ -38,7 +56,7 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
   // 저장 도중 다른 화면/계정으로 전환하면 늦게 온 응답으로 이전 글의 화면을 열지 않는다.
   useEffect(() => {
     active.current = true;
-    return () => { active.current = false; };
+    return () => { active.current = false; releaseImages(); };
   }, []);
 
   /** 새 글은 빈 입력으로, 수정 글은 최초 원본으로 복원한다. 실패 경로에서는 호출하지 않는다. */
@@ -47,7 +65,7 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
     setTitle(editingPost?.title ?? '');
     setContent(editingPost?.content ?? '');
     setHashtagInput(editingPost ? getPostTopicInput(editingPost.hashtags) : '');
-    setImages([]);
+    releaseImages();
     setError(null);
   };
 
@@ -70,32 +88,38 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
       return null;
     }
 
+    const submittingToken = authStorage.getAccessToken();
     submitting.current = true;
     setIsLoading(true);
     setError(null);
     // 이 호출이 시작된 시점의 입력을 요청으로 고정한다. 파일 변환/업로드는 서비스에서 한다.
-    const params: CreatePostParams = {
-      title: normalizedTitle,
-      content: normalizedContent,
-      images: images.length > 0 ? images : undefined,
-      hashtags,
-    };
-
     try {
-      // 이미지 수정 계약이 확정되지 않아 PATCH에는 images 키 자체를 넣지 않는다.
-      // 태그도 손대지 않았다면 생략해 표현 방식 때문에 기존 데이터가 바뀌지 않게 한다.
-      // 제목만 고친 경우에는 원본 본문의 앞뒤 공백까지 유지한다. 검증용 trim과 저장값을 구분한다.
-      const updates: UpdatePostParams = {
-        title: normalizedTitle,
-        content: content === editingPost?.content ? content : normalizedContent,
+      const references = new Set(imageReferences(content));
+      const selected = pendingImages.current.filter((image) => references.has(image.url));
+      const submittedContent = mapMarkdownImages(content === editingPost?.content ? content : normalizedContent,
+        (url) => {
+          const image = selected.find((item) => item.url === url);
+          return image ? `upload://${image.id}` : url;
+        });
+      const params: CreatePostParams = {
+        title: normalizedTitle, content: submittedContent, hashtags,
+        ...(selected.length ? { images: selected.map((image) => image.file), image_ids: selected.map((image) => image.id) } : {}),
       };
+      // 기존 본문에서 이미지 노드를 제거하면 해당 ID도 유지 목록에서 제외한다.
+      // 원래 본문에 없던 서버 첨부는 텍스트 수정만으로 삭제하지 않는다.
+      const originalRefs = new Set(imageReferences(editingPost?.content ?? ''));
+      const updates: UpdatePostParams = { ...params, hashtags: undefined,
+        ...(editingPost?.images.length ? { keep_image_ids: editingPost.images.filter((image) =>
+          references.has(image.image_url) || !originalRefs.has(image.image_url)).map((image) => image.id) } : {}),
+      };
+      validatePostInput(editingPost ? updates : params);
       if (editingPost && (category !== getPostCategory(editingPost.hashtags) || hashtagInput !== getPostTopicInput(editingPost.hashtags))) {
         updates.hashtags = hashtags;
       }
       const savedPost = editingPost
         ? await postApi.updatePost(editingPost.id, updates)
         : await postApi.createPost(params);
-      if (!active.current) return savedPost;
+      if (!active.current || authStorage.getAccessToken() !== submittingToken) return savedPost;
       if (!editingPost) reset();
 
       try {
@@ -116,7 +140,7 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
   };
 
   return {
-    category, setCategory, title, content, hashtagInput, hashtags, images, isLoading, error,
-    setTitle, setContent, setHashtagInput, setImages, submit, reset,
+    category, setCategory, title, content, hashtagInput, hashtags, addImages, isLoading, error,
+    setTitle, setContent, setHashtagInput, submit, reset,
   };
 };
