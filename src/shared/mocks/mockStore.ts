@@ -31,6 +31,29 @@ export interface MockDatabase {
   comments: CommentEntity[];
 }
 
+/**
+ * 메뉴 표시용으로 현재 액세스 토큰과 실제 Mock 세션의 사용자·만료 시간을 대조한다.
+ * React 스냅샷에서 호출하므로 DB 생성/마이그레이션/삭제 없이 읽기만 수행한다.
+ * 오래된 토큰, 손상된 저장소, 알 수 없는 사용자는 로그인 전 상태로 표시하며 원본 데이터는 보존한다.
+ */
+export const getActiveMockUserId = (): number | null => {
+  const token = authStorage.getAccessToken();
+  if (!token) return null;
+
+  try {
+    const data = JSON.parse(localStorage.getItem(DATABASE_KEY) ?? 'null');
+    if (!data || data.version !== 1 || !Array.isArray(data.sessions)) return null;
+
+    const session = data.sessions.find((item: MockSession | null) => item?.access_token === token);
+    if (!session || !Number.isFinite(session.expires_at) || session.expires_at <= Date.now()) return null;
+
+    const user = MOCK_USERS.find((item) => item.id === session.user_id);
+    return user && user.id === authStorage.getUserId() ? user.id : null;
+  } catch {
+    return null;
+  }
+};
+
 /** 첫 실행용 댓글과 답글이다. 실제로 존재하는 데이터만 집계하고 코드는 실행하지 않는 예시로 저장한다. */
 const createInitialComments = (): CommentEntity[] => [
   { id: 1, post_id: 1, user_id: 102, username: '개발용사', account_id: 'dev_hero',

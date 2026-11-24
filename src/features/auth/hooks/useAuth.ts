@@ -61,13 +61,19 @@ export const useAuth = () => {
     }
   };
 
-  /** 서버 세션 무효화에 성공하면 로컬 정보를 지운다. 서버 요청 실패 시 세션은 유지한다. */
+  /**
+   * 클릭 시 토큰을 다시 읽어 오래된 메뉴 상태에서도 로그아웃을 처리한다.
+   * 액세스/갱신 토큰이 없으면 로컬 인증 정보를 정리하고 로그인 화면으로 이동할 수 있게 성공을 반환한다.
+   * 두 토큰이 있는 경우는 서버 무효화를 요청하며, 요청 실패 시 재시도할 수 있도록 세션을 유지한다.
+   */
   const logout = async (): Promise<boolean> => {
+    const accessToken = authStorage.getAccessToken();
     const refreshToken = authStorage.getRefreshToken();
 
-    if (!refreshToken) {
+    if (!accessToken || !refreshToken) {
       authStorage.clear();
       setUser(null);
+      setError(null);
       return true;
     }
 

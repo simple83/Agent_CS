@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string;
   readonly VITE_USE_MOCK_API?: string;
   readonly VITE_MOCK_DELAY_MS?: string;
+  /** 'false'이면 Mock 데이터는 유지하면서 화면의 개발용 도구만 숨긴다. */
+  readonly VITE_SHOW_MOCK_TOOLBAR?: string;
 }
 
 /** import.meta.env에 위 환경 변수 타입을 연결한다. 실제 값 검증은 apiMode에서 수행한다. */

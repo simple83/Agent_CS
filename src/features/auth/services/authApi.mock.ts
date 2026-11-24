@@ -44,16 +44,19 @@ export const mockAuthApi: AuthApi = {
     saveMockDatabase(data);
     return { access_token: session.access_token, refresh_token, token_type: 'bearer' };
   },
-  /** 해당 갱신 토큰의 세션을 삭제한다. 같은 사용자의 다른 로그인 세션은 유지한다. */
+  /**
+   * 해당 갱신 토큰의 세션을 삭제한다. 이미 없거나 만료된 세션도 로그아웃 완료로 취급한다.
+   * 오래된 토큰 때문에 화면 이동이 막히지 않게 하며 다른 세션·게시글은 보존한다.
+   * 저장소 오류/테스트 요청 실패는 그대로 전달하므로 실제 실패를 성공으로 숨기지는 않는다.
+   */
   async logout({ refresh_token }) {
     await waitForMockRequest();
     const data = readMockDatabase();
     const session = data.sessions.find((item) => item.refresh_token === refresh_token);
-    if (!session || session.refresh_expires_at <= Date.now()) {
-      throw new Error('refresh token이 유효하지 않거나 만료되었습니다.');
+    if (session) {
+      data.sessions = data.sessions.filter((item) => item !== session);
+      saveMockDatabase(data);
     }
-    data.sessions = data.sessions.filter((item) => item !== session);
-    saveMockDatabase(data);
     return { detail: '로그아웃이 완료되었습니다.' };
   },
 };

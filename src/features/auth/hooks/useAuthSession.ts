@@ -1,8 +1,12 @@
 import { useSyncExternalStore } from 'react';
 import { authStorage } from '../../../shared/services/authStorage';
+import { isMockApi } from '../../../shared/config/apiMode';
+import { getActiveMockUserId } from '../../../shared/mocks/mockStore';
 
-/** 메뉴 표시용 로그인 여부다. 토큰의 만료/실제 요청 권한은 서버가 최종 판단한다. */
-const getSnapshot = () => Boolean(authStorage.getAccessToken());
+/** Mock은 저장된 세션의 유효성까지 확인한다. 실제 모드의 최종 인증 판단은 서버가 담당한다. */
+const getSnapshot = () => isMockApi
+  ? getActiveMockUserId() !== null
+  : Boolean(authStorage.getAccessToken());
 
 /** 서버 렌더링에는 브라우저 저장소가 없으므로 로그인 전 상태로 시작한다. */
 const getServerSnapshot = () => false;
@@ -11,8 +15,10 @@ const getServerSnapshot = () => false;
 export const useAuthSession = () =>
   useSyncExternalStore(authStorage.subscribe, getSnapshot, getServerSnapshot);
 
-/** 토큰과 사용자 번호가 모두 있을 때만 작성자 메뉴에 사용할 번호를 반환한다. */
-const getUserSnapshot = () => authStorage.getAccessToken() ? authStorage.getUserId() : null;
+/** 메뉴와 작성자 도구에 동일한 로그인 판단을 적용해 만료된 Mock 계정의 관리 버튼도 숨긴다. */
+const getUserSnapshot = () => isMockApi
+  ? getActiveMockUserId()
+  : authStorage.getAccessToken() ? authStorage.getUserId() : null;
 
 /** 서버 렌더링에서는 저장된 사용자를 알 수 없으므로 작성자 기능을 숨긴다. */
 const getServerUserSnapshot = () => null;

@@ -1,17 +1,20 @@
 import styles from './AppNavigation.module.css';
 import { useRef } from 'react';
-import { NavLink, useNavigate } from 'react-router';
+import { NavLink, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../hooks/useAuth';
 import { useAuthSession } from '../hooks/useAuthSession';
 
 /** 공통 메뉴의 인증 버튼을 현재 세션과 연결한다. 로그아웃 요청은 기존 Mock/Real API를 사용한다. */
 export const AppNavigation = () => {
+  // 공통 메뉴는 페이지 이동에도 유지된다. 경로 변경을 구독해 저장소 스냅샷을 다시 읽는다.
+  useLocation();
+
   const loggedIn = useAuthSession();
   const { logout, isLoading, error } = useAuth();
   const navigate = useNavigate();
   const pending = useRef(false);
 
-  /** 연속 클릭을 막고 성공할 때만 이동한다. 실패 시 세션과 현재 화면을 유지해 재시도할 수 있다. */
+  /** 중복 요청을 막는다. 토큰이 없는 경우도 logout이 성공으로 처리해 로그인 화면으로 이동한다. */
   const handleLogout = async () => {
     if (pending.current) return;
     pending.current = true;

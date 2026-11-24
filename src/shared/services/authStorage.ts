@@ -6,6 +6,12 @@ const prefix = isMockApi ? 'agent-cs:mock:auth:' : '';
 const keys = ['access_token', 'refresh_token', 'user_id', 'account_id'] as const;
 const changeEvent = 'agent-cs:auth-changed';
 
+/** 빈 값이나 잘못 저장된 null/undefined 문자열은 요청에 사용할 토큰으로 취급하지 않는다. */
+const readToken = (key: 'access_token' | 'refresh_token') => {
+  const token = localStorage.getItem(`${prefix}${key}`)?.trim();
+  return token && token !== 'null' && token !== 'undefined' ? token : null;
+};
+
 /** 같은 탭에서는 storage 이벤트가 발생하지 않으므로 저장 완료 후 별도 알림을 보낸다. */
 const notifyChange = () => {
   if (typeof window !== 'undefined') window.dispatchEvent(new window.Event(changeEvent));
@@ -16,17 +22,28 @@ const notifyChange = () => {
  * 토큰은 암호화되지 않으며 같은 출처의 스크립트에서 접근 가능하므로 XSS 방어가 필요하다.
  */
 export const authStorage = {
-  /** 현재 탭의 저장/삭제와 다른 탭의 인증 변경을 구독한다. 해제 함수로 중복 구독을 방지한다. */
+  /** 인증 변경과 탭 복귀를 구독한다. 직접 저장소를 수정해 알림이 없었던 경우도 복귀 시 다시 읽는다. */
   subscribe(onChange: () => void) {
     const onStorage = (event: StorageEvent) => {
       if (event.storageArea !== localStorage) return;
-      if (event.key === null || keys.some((key) => event.key === `${prefix}${key}`)) onChange();
+      // 다른 탭에서 Mock 세션만 제거한 경우도 토큰 변경과 동일하게 다시 확인한다.
+      if (event.key === null || keys.some((key) => event.key === `${prefix}${key}`)
+        || (isMockApi && event.key === 'agent-cs:mock:v1:database')) onChange();
     };
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') onChange();
+    };
+
     window.addEventListener(changeEvent, onChange);
     window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onChange);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       window.removeEventListener(changeEvent, onChange);
       window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onChange);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   },
 
@@ -36,9 +53,9 @@ export const authStorage = {
     return Number.isSafeInteger(id) && id > 0 ? id : null;
   },
   /** 보호된 API의 Authorization 헤더에 넣을 액세스 토큰을 읽는다. 없으면 null이다. */
-  getAccessToken: () => localStorage.getItem(`${prefix}access_token`),
+  getAccessToken: () => readToken('access_token'),
   /** 갱신/로그아웃 요청에 사용할 리프레시 토큰을 읽는다. */
-  getRefreshToken: () => localStorage.getItem(`${prefix}refresh_token`),
+  getRefreshToken: () => readToken('refresh_token'),
   /** 로그인 응답의 토큰과 사용자 식별자를 문자열로 저장한다. */
   saveLogin(data: LoginResponse) {
     for (const key of keys) localStorage.setItem(`${prefix}${key}`, String(data[key]));
