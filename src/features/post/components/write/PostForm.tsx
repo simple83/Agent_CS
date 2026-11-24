@@ -1,7 +1,7 @@
 import { lazy, Suspense, type FormEvent } from 'react';
 import { usePostForm } from '../../hooks/usePostForm';
 import type { PostEntity } from '../../types/post.types';
-import { POST_CATEGORIES, isPostCategory, type PostCategory } from '../../utils/postEditor';
+import { POST_BOARD_TAGS, isPostBoardTag, type PostBoardTag } from '../../utils/postEditor';
 import styles from './PostForm.module.css';
 import layout from '../../styles/PostLayout.module.css';
 import ui from '../../../../shared/styles/Controls.module.css';
@@ -14,7 +14,7 @@ interface PostFormProps {
   /** 저장 성공 알림을 Page에 반환하여 화면 전환 책임을 분리한다. */
   onCreated?: (post: PostEntity) => void;
   /** 목록에서 전달한 최초 말머리이며 작성 중 선택은 Hook이 관리한다. */
-  initialCategory?: PostCategory;
+  initialBoardTag?: PostBoardTag;
   /** 수정할 원본이다. 조회 완료 후 마운트하고 글 번호가 바뀌면 key로 폼을 교체한다. */
   initialPost?: PostEntity;
   /** 수정 저장과 취소 후의 이동은 Page가 처리한다. */
@@ -27,12 +27,12 @@ interface PostFormProps {
  * 시각적 편집기가 변환한 Markdown을 기존 Hook에 넘기므로 서비스에서 이미지 임시 참조와 파일을 함께 전송한다.
  * 코드는 본문에서 바로 편집하므로 별도 코드 초안이나 삽입 대기 상태가 필요 없다.
  */
-export const PostForm = ({ onCreated, initialCategory, initialPost, onUpdated, onCancel }: PostFormProps) => {
+export const PostForm = ({ onCreated, initialBoardTag, initialPost, onUpdated, onCancel }: PostFormProps) => {
   const isEditing = Boolean(initialPost);
   const {
-    title, content, category, hashtagInput, hashtags, addImages, isLoading, error,
-    setTitle, setContent, setCategory, setHashtagInput, submit,
-  } = usePostForm({ onCreated, initialCategory, initialPost, onUpdated });
+    title, content, boardTag, hashtagInput, hashtags, addImages, isLoading, error,
+    setTitle, setContent, setBoardTag, setHashtagInput, submit,
+  } = usePostForm({ onCreated, initialBoardTag, initialPost, onUpdated });
 
   /** 기본 페이지 전송을 막고 Hook의 저장 흐름으로 전달한다. 성공할 때만 파일 입력을 비운다. */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -49,10 +49,10 @@ export const PostForm = ({ onCreated, initialCategory, initialPost, onUpdated, o
 
       <div className={styles.titleRow}>
         <label className={ui.field}>말머리
-          <select className={ui.input} value={category} disabled={isLoading} onChange={(event) => {
-            if (isPostCategory(event.target.value)) setCategory(event.target.value);
+          <select className={ui.input} value={boardTag} disabled={isLoading} onChange={(event) => {
+            if (isPostBoardTag(event.target.value)) setBoardTag(event.target.value);
           }}>
-            {POST_CATEGORIES.map((item) => <option key={item}>{item}</option>)}
+            {POST_BOARD_TAGS.map((item) => <option key={item}>{item}</option>)}
           </select>
         </label>
         <label className={ui.field}>제목 *

@@ -40,10 +40,10 @@ after(async () => {
 const tags = (...names) => names.map((name, id) => ({ name, id }));
 test('새 글은 말머리 하나와 고유 태그를 저장하고 기존 글의 분류는 태그 순서에 영향받지 않는다', () => {
   assert.deepEqual(utils.getPostTags('코드리뷰', '#C++, C++, 질문, # 질문, , 코드리뷰, 알고리즘'), ['코드리뷰', 'C++', '알고리즘']);
-  assert.equal(utils.getPostCategory(tags('React')), '자유');
-  assert.equal(utils.getPostCategory(tags('밥친구', '질문')), '질문');
-  assert.equal(utils.getPostCategory(tags('질문', '밥친구')), '질문');
-  assert.equal(utils.isPostCategory('공지'), false);
+  assert.equal(utils.getPostBoardTag(tags('React')), '자유');
+  assert.equal(utils.getPostBoardTag(tags('밥친구', '질문')), '질문');
+  assert.equal(utils.getPostBoardTag(tags('질문', '밥친구')), '질문');
+  assert.equal(utils.isPostBoardTag('공지'), false);
 });
 
 test('백틱 묶음이 매우 많아도 코드블록 생성이 함수 인자 한도를 초과하지 않는다', () => {
@@ -160,7 +160,7 @@ test('작성 실패 후 초안 전체를 보존하고 재시도는 기존 API �
   let created;
   /** 폼 UI 없이 Hook을 마운트해 상태 보존과 API 전달값을 확인한다. */
   function Probe() {
-    form = usePostForm({ initialCategory: '코드리뷰', onCreated: (post) => { created = post; } });
+    form = usePostForm({ initialBoardTag: '코드리뷰', onCreated: (post) => { created = post; } });
     return null;
   }
   try {
@@ -178,7 +178,7 @@ test('작성 실패 후 초안 전체를 보존하고 재시도는 기존 API �
     await act(async () => { await form.submit(); });
     assert.equal(form.content, markdown);
     assert.match(form.content, /blob:/);
-    assert.equal(form.category, '코드리뷰');
+    assert.equal(form.boardTag, '코드리뷰');
     assert.equal(form.error, '일시적인 오류');
     postApi.createPost = async (params) => { submitted = params; return { id: 77 }; };
     await act(async () => { await form.submit(); });

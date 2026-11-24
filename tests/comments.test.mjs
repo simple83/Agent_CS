@@ -35,6 +35,7 @@ const utils = await server.ssrLoadModule('/src/features/comment/utils/comments.t
 const { useComments } = await server.ssrLoadModule('/src/features/comment/hooks/useComments.ts');
 const { useCommentForm } = await server.ssrLoadModule('/src/features/comment/hooks/useCommentForm.ts');
 const { CommentSection } = await server.ssrLoadModule('/src/features/comment/components/CommentSection.tsx');
+const { CommentItem } = await server.ssrLoadModule('/src/features/comment/components/CommentItem.tsx');
 const { PostDetail } = await server.ssrLoadModule('/src/features/post/components/detail/PostDetail.tsx');
 const { MarkdownContent } = await server.ssrLoadModule('/src/shared/components/richText/MarkdownContent.tsx');
 const originalComments = { ...commentApi };
@@ -393,14 +394,74 @@ test('확정 문서의 중첩 댓글과 201 작성 응답을 내부 모델로 �
   }
 });
 
+// 운영 서버의 닉네임 null을 HTTP 경계부터 재현한다. 서버에 실제 댓글을 쓰지 않고
+// 중첩 목록과 원댓글/답글 작성·수정의 성공 응답이 오류로 바뀌지 않는지 검사한다.
+test('닉네임 없는 원댓글·대댓글의 조회·작성·수정 응답을 정상 처리한다', async () => {
+  const parent = { ...wireFixture(), author_username: null };
+  const reply = { ...wireFixture(), id: 99, parent_comment_id: parent.id, author_username: null };
+  globalThis.fetch = async () => Response.json([{ ...parent, replies: [reply] }]);
+  const comments = await realCommentApi.getComments(parent.post_id);
+  assert.equal(comments.length, 2);
+  assert.ok(comments.every((item) => item.username === null));
+  assert.equal(utils.groupComments(comments)[0].replies[0].id, reply.id);
+
+  realAuth.saveLogin({ access_token: 'token', refresh_token: 'refresh', user_id: parent.author_id, account_id: parent.author_account_id });
+  for (const [payload, status, request] of [
+    [parent, 201, () => realCommentApi.createComment(parent.post_id, parent.content)],
+    [reply, 201, () => realCommentApi.createReply(parent.post_id, parent.id, reply.content)],
+    [parent, 200, () => realCommentApi.updateComment(parent.post_id, parent.id, parent.content)],
+    [reply, 200, () => realCommentApi.updateComment(reply.post_id, reply.id, reply.content)],
+  ]) {
+    let calls = 0;
+    globalThis.fetch = async () => { calls++; return Response.json(payload, { status }); };
+    const saved = await request();
+    assert.equal(saved.username, null);
+    assert.equal(saved.account_id, payload.author_account_id);
+    assert.equal(saved.id, payload.id);
+    assert.equal(calls, 1);
+  }
+});
+
+// 정상 null만 허용한다. 닉네임 누락이나 잘못된 값, 본문 누락은 계속 실패해야 한다.
+test('댓글 닉네임 누락·잘못된 타입과 정상 댓글의 본문 누락을 거부한다', () => {
+  const parent = { ...wireFixture(), author_username: null };
+  for (const invalid of [undefined, 123, {}, []]) {
+    assert.throws(() => utils.normalizeCommentResponse([{ ...parent, author_username: invalid }], parent.post_id), /닉네임 응답/);
+    assert.throws(() => utils.normalizeCommentResponse([{ ...parent, replies: [
+      { ...parent, id: 99, parent_comment_id: parent.id, author_username: invalid },
+    ] }], parent.post_id), /닉네임 응답/);
+  }
+  assert.throws(() => utils.normalizeCommentResponse([{ ...parent, content: undefined }], parent.post_id), /필수 정보/);
+});
+
+// 표시 이름뿐 아니라 접근성 설명과 답글 폼 안내에도 null 문자열이 노출되지 않게 한다.
+test('닉네임 없는 댓글은 작성자와 답글 대상에 계정 ID를 표시한다', async () => {
+  const comment = fixture({ username: null, account_id: 'no_nickname' });
+  const mounted = await mount(createElement(CommentItem, { comment, userId: 101, postAuthorId: 101,
+    busy: false, onReply: async () => {}, onUpdate: async () => {}, onRemove: async () => {} }));
+  assert.equal(mounted.container.querySelector('strong').textContent, 'no_nickname');
+  assert.equal(mounted.container.querySelector('article').getAttribute('aria-label'), 'no_nickname의 댓글');
+  await act(async () => button(mounted.container, '답글').click());
+  assert.equal(mounted.container.querySelector('form').getAttribute('aria-label'), 'no_nickname에게 답글');
+  await waitFor(() => mounted.container.querySelector('[contenteditable="true"]'));
+});
+
 test('삭제 부모의 null 본문과 답글을 보존하고 정상 댓글의 null 본문은 오류로 구분한다', () => {
-  const parent = { ...wireFixture(), content: null, is_deleted: true };
-  parent.replies = [{ ...wireFixture(), id: 99, parent_comment_id: parent.id, content: '보존할 답글' }];
+  const parent = { ...wireFixture(), content: null, is_deleted: true, author_username: null };
+  parent.replies = [{ ...wireFixture(), id: 99, parent_comment_id: parent.id, content: '보존할 답글', author_username: null }];
   const result = utils.normalizeCommentResponse([parent], 1);
   assert.equal(result.find((item) => item.id === parent.id).content, '');
   assert.equal(utils.groupComments(result)[0].replies[0].content, '보존할 답글');
   assert.throws(() => utils.normalizeCommentResponse([{ ...parent, is_deleted: false }], 1), /필수 정보/);
   assert.throws(() => utils.normalizeCommentResponse([{ ...parent, replies: [{ ...parent.replies[0], parent_comment_id: 999 }] }], 1), /부모 정보/);
+});
+
+test('선택 replies 생략은 허용하지만 null 배열과 필수 작성자 이미지 누락은 거부한다', async () => {
+  const parent = { ...wireFixture(), replies: undefined, author_username: null };
+  globalThis.fetch = async () => Response.json([parent]);
+  assert.equal((await realCommentApi.getComments(parent.post_id)).length, 1);
+  assert.throws(() => utils.normalizeCommentResponse([{ ...parent, replies: null }], parent.post_id), /부모 정보/);
+  assert.throws(() => utils.normalizeCommentResponse([{ ...parent, author_image_url: undefined }], parent.post_id), /작성자 이미지/);
 });
 
 test('댓글은 이모지를 한 글자로 세며 Markdown 포함 5000자 경계를 적용한다', () => {

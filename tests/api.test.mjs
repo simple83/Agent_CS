@@ -197,7 +197,8 @@ test('실제 모드는 fetch·인코딩된 검색·bearer 인증·multipart 직�
   const calls = [];
   globalThis.fetch = async (url, options) => {
     calls.push({ url, options });
-    return Response.json(options.method === 'GET' ? contract['GET /posts'] : { ...detailFixture, id: 42 });
+    return Response.json(url.endsWith('/auth/login') ? contract['POST /auth/login']
+      : options.method === 'GET' ? contract['GET /posts'] : { ...detailFixture, id: 42 });
   };
   real.authStorage.saveLogin({ access_token: 'real-token', refresh_token: 'real-refresh',
     user_id: 7, account_id: 'real-user', token_type: 'bearer' });
@@ -208,13 +209,69 @@ test('실제 모드는 fetch·인코딩된 검색·bearer 인증·multipart 직�
   await real.postApi.createPost({ title: 'title', content: '![사진](upload://photo)', hashtags: ['React'], images: [file], image_ids: ['photo'] });
   assert.equal(calls[1].options.headers.Authorization, 'bearer real-token');
   assert.equal(calls[1].options.headers['Content-Type'], undefined);
-  assert.equal(calls[1].options.body.get('hashtags'), '["react"]');
+  assert.deepEqual(calls[1].options.body.getAll('hashtags'), ['react']);
   assert.equal(calls[1].options.body.get('images').name, 'photo.png');
   await real.authApi.login({ account_id: 'real-user', password: 'example' });
   assert.equal(calls[2].url, 'https://backend.example.test/api/auth/login');
   assert.equal(calls[2].options.method, 'POST');
   globalThis.fetch = async () => Response.json({ detail: 'server error' }, { status: 401 });
   await assert.rejects(real.postApi.getPost(42), /server error/);
+});
+
+// 쉼표 입력부터 실제 multipart까지 연결해 서버가 한 필드로 해석할 배열 문자열을 보내지 않게 한다.
+test('python,fastapi 입력은 개별 hashtags로 전송하고 이미지 배열도 반복 키와 순서를 유지한다', async () => {
+  const editor = await servers[1].ssrLoadModule('/src/features/post/utils/postEditor.ts');
+  real.authStorage.saveLogin({ access_token: 'token', refresh_token: 'refresh', user_id: 1, account_id: 'user' });
+  const calls = [];
+  globalThis.fetch = async (_url, options) => { calls.push(options.body); return Response.json(detailFixture); };
+  const files = [new File(['one'], 'one.png'), new File(['two'], 'two.png')];
+  await real.postApi.createPost({ title: '태그 검사', content: '![1](upload://one)\n\n![2](upload://two)',
+    hashtags: editor.getPostTags('질문', 'python,fastapi'), images: files, image_ids: ['one', 'two'] });
+  assert.deepEqual(calls[0].getAll('hashtags'), ['질문', 'python', 'fastapi']);
+  assert.deepEqual(calls[0].getAll('image_ids'), ['one', 'two']);
+  assert.deepEqual(calls[0].getAll('images').map((file) => file.name), ['one.png', 'two.png']);
+  await real.postApi.updatePost(1, { hashtags: ['python', 'fastapi'], keep_image_ids: [10, 11] });
+  assert.deepEqual(calls[1].getAll('hashtags'), ['python', 'fastapi']);
+  assert.deepEqual(calls[1].getAll('keep_image_ids'), ['10', '11']);
+  await real.postApi.updatePost(1, { hashtags: [], keep_image_ids: [] });
+  assert.deepEqual(calls[2].getAll('hashtags'), ['[]']);
+  assert.deepEqual(calls[2].getAll('keep_image_ids'), ['[]']);
+  await real.postApi.updatePost(1, { title: '그대로' });
+  assert.equal(calls[3].has('hashtags'), false);
+  assert.equal(calls[3].has('keep_image_ids'), false);
+});
+
+test('명세상 생략 가능한 게시글 배열은 빈 배열로 처리하고 null과 필수 본문 누락은 거부한다', async () => {
+  globalThis.fetch = async () => Response.json({ ...detailFixture, hashtags: undefined, images: undefined });
+  const result = await real.postApi.getPost(detailFixture.id);
+  assert.deepEqual(result.hashtags, []);
+  assert.deepEqual(result.images, []);
+  for (const field of ['hashtags', 'images']) {
+    globalThis.fetch = async () => Response.json({ ...detailFixture, [field]: null });
+    await assert.rejects(real.postApi.getPost(detailFixture.id), /응답/);
+  }
+  globalThis.fetch = async () => Response.json({ ...detailFixture, content: undefined });
+  await assert.rejects(real.postApi.getPost(detailFixture.id), /상세 응답/);
+});
+
+test('인증 응답의 기본 token_type을 적용하고 누락되거나 잘못된 토큰은 저장 전에 거부한다', async () => {
+  const session = contract['POST /auth/login'];
+  globalThis.fetch = async () => Response.json({ ...session, token_type: undefined });
+  assert.equal((await real.authApi.login({ account_id: session.account_id, password: 'password' })).token_type, 'bearer');
+  globalThis.fetch = async () => Response.json({ access_token: 'next' });
+  assert.deepEqual(await real.authApi.refresh({ refresh_token: 'refresh' }), { access_token: 'next', token_type: 'bearer' });
+  for (const patch of [{ access_token: null }, { refresh_token: '' }, { user_id: null }, { token_type: null }]) {
+    globalThis.fetch = async () => Response.json({ ...session, ...patch });
+    await assert.rejects(real.authApi.login({ account_id: session.account_id, password: 'password' }), /응답|토큰/);
+  }
+  assert.equal(real.authStorage.getAccessToken(), null);
+});
+
+test('마스킹 값·상대 경로·쿼리 포함 API 주소는 네트워크 요청 전에 거부한다', async () => {
+  for (const url of ['•••••', '/api', 'https:api.example.test', 'https://api.example.test?x=1']) {
+    const invalid = await loadMode('real', url);
+    await assert.rejects(invalid.postApi.getPosts(), /VITE_API_BASE_URL/);
+  }
 });
 
 test('실제 API 주소가 없으면 프론트 서버로 잘못 요청하지 않고 실패한다', async () => {
@@ -239,7 +296,7 @@ test('실제 수정은 이미지 없는 multipart PATCH이고 삭제는 인증�
   assert.equal(calls[0].options.body.has('images'), false);
   assert.equal(calls[0].options.body.has('hashtags'), false);
   await real.postApi.updatePost(42, { hashtags: ['코드리뷰', 'C++'] });
-  assert.equal(calls[1].options.body.get('hashtags'), '["코드리뷰","c++"]');
+  assert.deepEqual(calls[1].options.body.getAll('hashtags'), ['코드리뷰', 'c++']);
   assert.deepEqual(await real.postApi.deletePost(42), { detail: '삭제 완료' });
   assert.equal(calls[2].options.method, 'DELETE');
   assert.equal(calls[2].options.headers.Authorization, 'bearer real-token');
@@ -395,8 +452,8 @@ test('multipart 이미지 참조·유지 ID와 목록 페이지 옵션을 실제
   assert.ok(calls[0].url.endsWith('?sort=view_count&limit=30&offset=60'));
   const file = new File(['png'], 'photo.png', { type: 'image/png' });
   await real.postApi.updatePost(1, { content: '![새 사진](upload://new)', images: [file], image_ids: ['new'], keep_image_ids: [10] });
-  assert.equal(calls[1].options.body.get('image_ids'), '["new"]');
-  assert.equal(calls[1].options.body.get('keep_image_ids'), '[10]');
+  assert.deepEqual(calls[1].options.body.getAll('image_ids'), ['new']);
+  assert.deepEqual(calls[1].options.body.getAll('keep_image_ids'), ['10']);
   assert.equal(calls[1].options.body.getAll('images').length, 1);
   await real.postApi.updatePost(1, { content: '이미지 없음', keep_image_ids: [] });
   assert.equal(calls[2].options.body.get('keep_image_ids'), '[]');

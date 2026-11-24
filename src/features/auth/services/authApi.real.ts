@@ -13,6 +13,7 @@ import { ApiError } from '../../../shared/services/ApiError';
 import type { AuthApi } from '../types/authApi.types';
 import { realApiUrl } from '../../../shared/config/apiMode';
 import { validateSignup } from '../utils/signup';
+import { parseLoginResponse, parseRefreshResponse } from '../utils/authContract';
 
 /* 오류 응답의 문자열 detail을 우선 사용하고, JSON이 아니거나 구조가 다르면 기본 문구를 쓴다. */
 const getErrorMessage = async (response: Response, fallback: string) => {
@@ -78,7 +79,7 @@ export const realAuthApi: AuthApi = {
       );
     }
 
-    return response.json();
+    return parseLoginResponse(await response.json());
   },
 
   /* 갱신 토큰을 JSON 본문으로 보내 새 액세스 토큰을 요청한다. 자동 재시도는 수행하지 않는다. */
@@ -95,7 +96,7 @@ export const realAuthApi: AuthApi = {
       );
     }
 
-    return response.json();
+    return parseRefreshResponse(await response.json());
   },
 
   /* 서버에 갱신 토큰의 무효화를 요청한다. 성공 후 로컬 정보 삭제는 호출자가 수행한다. */

@@ -5,7 +5,7 @@ import { MarkdownContent } from '../../../../shared/components/richText/Markdown
 import { PostLikeControl } from './PostLikeControl';
 import { PostOwnerActions } from './PostOwnerActions';
 import { useAuthUserId } from '../../../auth/hooks/useAuthSession';
-import { getPostCategory } from '../../utils/postEditor';
+import { getPostBoardTag } from '../../utils/postEditor';
 import styles from './PostDetail.module.css';
 import ui from '../../../../shared/styles/Controls.module.css';
 
@@ -44,7 +44,7 @@ export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
     <article className={styles.container}>
       <header className={styles.header}>
         <div className={styles.headingRow}>
-          <span className={ui.badge}>{getPostCategory(post.hashtags)}</span>
+          <span className={ui.badge}>{getPostBoardTag(post.hashtags)}</span>
           {/* 계정 전환 때 관리 상태도 초기화한다. 실제 권한은 서버가 최종 검증한다. */}
           {userId === post.author_id && onEdit && onDeleted && <PostOwnerActions
             key={`${post.id}:${userId}`} postId={post.id} authorId={post.author_id}

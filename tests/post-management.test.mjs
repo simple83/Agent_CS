@@ -34,6 +34,8 @@ const { usePostDelete } = await server.ssrLoadModule('/src/features/post/hooks/u
 const { PostEditPage } = await server.ssrLoadModule('/src/pages/PostEditPage.tsx');
 const { PostDetailPage } = await server.ssrLoadModule('/src/pages/PostDetailPage.tsx');
 const { PostOwnerActions } = await server.ssrLoadModule('/src/features/post/components/detail/PostOwnerActions.tsx');
+const { PostListPage } = await server.ssrLoadModule('/src/pages/PostListPage.tsx');
+const { PostCreatePage } = await server.ssrLoadModule('/src/pages/PostCreatePage.tsx');
 const { readMockDatabase, saveMockDatabase, failNextMockRequest } = await server.ssrLoadModule('/src/shared/mocks/mockStore.ts');
 const { getEditedPostTags, getPostTopicInput } = await server.ssrLoadModule('/src/features/post/utils/postEditor.ts');
 const originalApi = { ...postApi };
@@ -96,12 +98,49 @@ afterEach(async () => {
 
 after(async () => { await server.close(); dom.window.close(); });
 
-test('태그를 손대지 않으면 원본을 보존하고 말머리를 명시적으로 바꾸면 선택한 분류 하나를 저장한다', () => {
+test('수정 시 쉼표 결합 태그를 분리하고 다른 원본 태그는 보존하며 말머리 변경을 반영한다', () => {
   const tags = ['질문', '밥친구', 'a,b', ' 태그 '].map((name, id) => ({ name, id }));
-  assert.deepEqual(getEditedPostTags(tags, '질문', getPostTopicInput(tags)), tags.map((tag) => tag.name));
-  assert.deepEqual(getEditedPostTags(tags, '모집', getPostTopicInput(tags)), ['모집', 'a,b', ' 태그 ']);
+  assert.deepEqual(getEditedPostTags(tags, '질문', getPostTopicInput(tags)), ['질문', '밥친구', 'a', 'b', ' 태그 ']);
+  assert.deepEqual(getEditedPostTags(tags, '모집', getPostTopicInput(tags)), ['모집', 'a', 'b', ' 태그 ']);
   assert.deepEqual(getEditedPostTags(tags, '질문', '밥친구, React, #React'), ['질문', '밥친구', 'React']);
   assert.deepEqual(getEditedPostTags([], '자유', ''), []);
+});
+
+// 브라우저 URL과 실제 API 조회 옵션을 함께 검사한다. 예전 링크는 읽되 새 링크는 tag만 만든다.
+test('목록 tag와 기존 category 링크를 복원하고 말머리 전환·글쓰기는 tag URL을 사용한다', async () => {
+  await login();
+  const calls = [];
+  postApi.getPosts = async (params) => { calls.push(params); return []; };
+  function QueryProbe() { const loc = useLocation(); return createElement('output', null, loc.pathname + loc.search); }
+  for (const query of ['category=질문', 'tag=질문&category=모집']) {
+    const mounted = await mount(createElement(MemoryRouter, { initialEntries: [`/posts?${query}`] },
+      createElement(Routes, null,
+        createElement(Route, { path: '/posts', element: createElement(PostListPage) }),
+        createElement(Route, { path: '/posts/create', element: createElement(PostCreatePage) })), createElement(QueryProbe)));
+    await waitFor(() => calls.at(-1)?.tag === '질문');
+    assert.equal('category' in calls.at(-1), false);
+    await act(async () => button(mounted.container, '정보공유').click());
+    await waitFor(() => calls.at(-1)?.tag === '정보공유');
+    assert.equal(new URLSearchParams(mounted.container.querySelector('output').textContent.split('?')[1]).has('category'), false);
+    await act(async () => button(mounted.container, '글쓰기').click());
+    await waitFor(() => mounted.container.querySelector('select')?.value === '정보공유');
+    assert.ok(mounted.container.querySelector('output').textContent.startsWith('/posts/create?tag='));
+    await mounted.unmount();
+  }
+  const topic = await mount(createElement(MemoryRouter, { initialEntries: ['/posts?tag=python'] }, createElement(PostListPage)));
+  await waitFor(() => calls.at(-1)?.tag === 'python');
+  assert.equal(topic.container.querySelector('[aria-label="주제 태그 검색"]').value, 'python');
+});
+
+test('기존 python,fastapi 단일 태그는 수정 저장 시 두 태그로 복구한다', async () => {
+  await login();
+  const post = { ...await postApi.getPost(1), hashtags: [{ id: 1, name: 'python,fastapi' }] };
+  let form, sent;
+  function Probe() { form = usePostForm({ initialPost: post }); return null; }
+  await mount(createElement(Probe));
+  postApi.updatePost = async (_id, params) => { sent = params; return post; };
+  await act(async () => { await form.submit(); });
+  assert.deepEqual(sent.hashtags, ['python', 'fastapi']);
 });
 
 test('수정 초안은 부모 재조회와 저장 실패 후에도 보존하며 중복 PATCH와 이미지 전송을 막는다', async () => {

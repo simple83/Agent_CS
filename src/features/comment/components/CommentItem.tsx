@@ -22,6 +22,9 @@ export const CommentItem = ({ comment, userId, postAuthorId, busy, onReply, onUp
   const hidden = comment.is_deleted || comment.is_blurred;
   const owned = userId === comment.user_id;
 
+  // 닉네임이 없으면 계정 ID를 사용한다. 화면 이름·접근성 설명·답글 대상 안내를 일치시킨다.
+  const authorName = comment.username || comment.account_id;
+
   /** 삭제 여부는 서버 성공 후에만 목록에 반영한다. 부모가 삭제되어도 기존 답글은 남는다. */
   const remove = async () => {
     const warning = comment.parent_comment_id === null
@@ -33,9 +36,9 @@ export const CommentItem = ({ comment, userId, postAuthorId, busy, onReply, onUp
     catch (err: unknown) { setError(err instanceof Error ? err.message : '댓글 삭제에 실패했습니다.'); }
   };
 
-  return <article className={styles.item} aria-label={comment.is_deleted ? '삭제된 댓글' : `${comment.username}의 댓글`}>
+  return <article className={styles.item} aria-label={comment.is_deleted ? '삭제된 댓글' : `${authorName}의 댓글`}>
     <header className={styles.meta}>
-      <strong>{comment.is_deleted ? '삭제된 댓글' : comment.username}</strong>
+      <strong>{comment.is_deleted ? '삭제된 댓글' : authorName}</strong>
       {!comment.is_deleted && <span>@{comment.account_id}</span>}
       {!comment.is_deleted && comment.user_id === postAuthorId && <span className={ui.badge}>글쓴이</span>}
       <time dateTime={comment.created_at}>{new Date(comment.created_at).toLocaleString('ko-KR')}</time>
@@ -54,7 +57,7 @@ export const CommentItem = ({ comment, userId, postAuthorId, busy, onReply, onUp
       {owned && <button type="button" className={ui.button} disabled={busy} onClick={() => void remove()}>삭제</button>}
     </div>}
     {error && <p role="alert" className={ui.error}>{error}</p>}
-    {!hidden && mode === 'reply' && <CommentForm label={`${comment.username}에게 답글`} disabled={busy}
+    {!hidden && mode === 'reply' && <CommentForm label={`${authorName}에게 답글`} disabled={busy}
       onSave={(content) => onReply(comment.id, content)} onSaved={() => setMode('read')} onCancel={() => setMode('read')} />}
   </article>;
 };

@@ -3,14 +3,14 @@ import { validatePostInput } from '../utils/postContract';
 import { useEffect, useRef, useState } from 'react';
 import { postApi } from '../services/postApi';
 import type { CreatePostParams, PostEntity, UpdatePostParams } from '../types/post.types';
-import { getEditedPostTags, getPostCategory, getPostTags, getPostTopicInput, type PostCategory } from '../utils/postEditor';
+import { getEditedPostTags, getPostBoardTag, getPostTags, getPostTopicInput, type PostBoardTag } from '../utils/postEditor';
 import { authStorage } from '../../../shared/services/authStorage';
 
 interface UsePostFormOptions {
   /** 저장된 글을 부모에게 알린다. Page가 상세 이동을 맡으며 비동기 콜백도 기다린다. */
   onCreated?: (post: PostEntity) => void | Promise<void>;
   /** 최초 진입 시 선택할 말머리. 작성 도중 URL이 바뀌어도 입력을 덮어쓰지 않는다. */
-  initialCategory?: PostCategory;
+  initialBoardTag?: PostBoardTag;
   /** 조회가 끝난 본인 글을 전달하면 수정 모드다. 다른 글로 이동할 때 폼을 key로 재마운트한다. */
   initialPost?: PostEntity;
   /** 수정 성공 후 이동을 Page에 위임한다. 작성 콜백과 구분해 POST/PATCH 흐름을 섞지 않는다. */
@@ -22,10 +22,10 @@ interface UsePostFormOptions {
  * UI는 반환한 상태/함수만 사용하며 Mock/Real 선택이나 FormData 직렬화는 서비스에 맡긴다.
  * 영구 임시 저장은 제공하지 않는다. 여기서의 입력 보존은 현재 마운트된 폼에 한정된다.
  */
-export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory = '자유' }: UsePostFormOptions = {}) => {
+export const usePostForm = ({ onCreated, onUpdated, initialPost, initialBoardTag = '자유' }: UsePostFormOptions = {}) => {
   // 최초 데이터만 기준으로 삼는다. 부모가 재조회 결과를 전달해도 편집 중인 초안을 덮어쓰지 않는다.
   const [editingPost] = useState(initialPost);
-  const [category, setCategory] = useState<PostCategory>(() => editingPost ? getPostCategory(editingPost.hashtags) : initialCategory);
+  const [boardTag, setBoardTag] = useState<PostBoardTag>(() => editingPost ? getPostBoardTag(editingPost.hashtags) : initialBoardTag);
   const [title, setTitle] = useState(editingPost?.title ?? '');
   const [content, setContent] = useState(editingPost?.content ?? '');
   const [hashtagInput, setHashtagInput] = useState(() => editingPost ? getPostTopicInput(editingPost.hashtags) : '');
@@ -51,7 +51,7 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
   // state 갱신은 다음 렌더에 반영된다. ref는 같은 렌더 안의 연속 호출도 즉시 차단한다.
   const submitting = useRef(false);
   const active = useRef(false);
-  const hashtags = editingPost ? getEditedPostTags(editingPost.hashtags, category, hashtagInput) : getPostTags(category, hashtagInput);
+  const hashtags = editingPost ? getEditedPostTags(editingPost.hashtags, boardTag, hashtagInput) : getPostTags(boardTag, hashtagInput);
 
   // 저장 도중 다른 화면/계정으로 전환하면 늦게 온 응답으로 이전 글의 화면을 열지 않는다.
   useEffect(() => {
@@ -61,7 +61,7 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
 
   /** 새 글은 빈 입력으로, 수정 글은 최초 원본으로 복원한다. 실패 경로에서는 호출하지 않는다. */
   const reset = () => {
-    setCategory(editingPost ? getPostCategory(editingPost.hashtags) : initialCategory);
+    setBoardTag(editingPost ? getPostBoardTag(editingPost.hashtags) : initialBoardTag);
     setTitle(editingPost?.title ?? '');
     setContent(editingPost?.content ?? '');
     setHashtagInput(editingPost ? getPostTopicInput(editingPost.hashtags) : '');
@@ -113,7 +113,10 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
           references.has(image.image_url) || !originalRefs.has(image.image_url)).map((image) => image.id) } : {}),
       };
       validatePostInput(editingPost ? updates : params);
-      if (editingPost && (category !== getPostCategory(editingPost.hashtags) || hashtagInput !== getPostTopicInput(editingPost.hashtags))) {
+      // 입력을 건드리지 않았더라도 과거의 쉼표 결합 태그가 분리되었다면 수정 요청에 포함한다.
+      const repairedTags = editingPost && (hashtags.length !== editingPost.hashtags.length
+        || hashtags.some((tag, index) => tag !== editingPost.hashtags[index]?.name));
+      if (editingPost && (repairedTags || boardTag !== getPostBoardTag(editingPost.hashtags) || hashtagInput !== getPostTopicInput(editingPost.hashtags))) {
         updates.hashtags = hashtags;
       }
       const savedPost = editingPost
@@ -140,7 +143,7 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialCategory
   };
 
   return {
-    category, setCategory, title, content, hashtagInput, hashtags, addImages, isLoading, error,
+    boardTag, setBoardTag, title, content, hashtagInput, hashtags, addImages, isLoading, error,
     setTitle, setContent, setHashtagInput, submit, reset,
   };
 };

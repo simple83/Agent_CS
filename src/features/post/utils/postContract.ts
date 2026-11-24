@@ -59,9 +59,11 @@ export const parsePostSummary = (value: unknown): PostSummary => {
   if (item.author_username !== null && typeof item.author_username !== 'string') throw new Error('게시글 작성자 닉네임 응답이 올바르지 않습니다.');
 
   if (item.author_image_url !== null && typeof item.author_image_url !== 'string') throw new Error('작성자 이미지 응답이 올바르지 않습니다.');
-  if (!Array.isArray(item.hashtags) || item.hashtags.some((tag) => !tag || !Number.isSafeInteger(tag.id) || typeof tag.name !== 'string')) throw new Error('태그 응답이 올바르지 않습니다.');
+  // OpenAPI에서 필수가 아닌 배열은 생략 시 빈 배열로 해석한다. 명시적인 null/잘못된 타입은 거부한다.
+  const hashtags = item.hashtags === undefined ? [] : item.hashtags;
+  if (!Array.isArray(hashtags) || hashtags.some((tag) => !tag || !Number.isSafeInteger(tag.id) || tag.id < 1 || typeof tag.name !== 'string')) throw new Error('태그 응답이 올바르지 않습니다.');
   return { id: item.id, title: item.title, author_id: item.author_id, author_account_id: item.author_account_id,
-    author_username: item.author_username, author_image_url: item.author_image_url, hashtags: item.hashtags,
+    author_username: item.author_username, author_image_url: item.author_image_url, hashtags,
     like_count: item.like_count, comment_count: item.comment_count, view_count: item.view_count,
     created_at: item.created_at, updated_at: item.updated_at } as PostSummary;
 };
@@ -70,9 +72,10 @@ export const parsePostSummary = (value: unknown): PostSummary => {
 export const parsePostDetail = (value: unknown): PostEntity => {
   const item = object(value);
   const summary = parsePostSummary(value);
-  if (typeof item.content !== 'string' || typeof item.is_deleted !== 'boolean' || !Array.isArray(item.images)
-    || item.images.some((image) => !image || !Number.isSafeInteger(image.id) || image.id < 1 || typeof image.image_url !== 'string')) throw new Error('게시글 상세 응답이 올바르지 않습니다.');
-  return { ...summary, content: item.content, images: item.images, is_deleted: item.is_deleted };
+  const images = item.images === undefined ? [] : item.images;
+  if (typeof item.content !== 'string' || typeof item.is_deleted !== 'boolean' || !Array.isArray(images)
+    || images.some((image) => !image || !Number.isSafeInteger(image.id) || image.id < 1 || typeof image.image_url !== 'string')) throw new Error('게시글 상세 응답이 올바르지 않습니다.');
+  return { ...summary, content: item.content, images, is_deleted: item.is_deleted };
 };
 
 /** 다른 게시글의 좋아요 응답이나 잘못된 합계는 현재 화면에 적용하지 않는다. */

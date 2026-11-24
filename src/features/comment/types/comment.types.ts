@@ -4,14 +4,15 @@ export interface CommentResponse {
   post_id: number;
   author_id: number;
   author_account_id: string;
-  author_username: string;
+  /** 닉네임 미설정 계정은 null을 반환하며 작성자 계정 ID는 별도로 유지한다. */
+  author_username: string | null;
   author_image_url: string | null;
   content: string | null;
   parent_comment_id: number | null;
   created_at: string;
   updated_at: string;
   is_deleted: boolean;
-  replies: CommentResponse[];
+  replies?: CommentResponse[];
 }
 
 /** 화면과 기존 Mock DB의 내부 모델이다. API 필드 이름은 서비스 경계에서 이 구조로 변환한다. */
@@ -19,7 +20,8 @@ export interface CommentEntity {
   id: number;
   post_id: number;
   user_id: number;
-  username: string;
+  /** 서버의 null을 보존한다. 표시할 때는 account_id를 대체 이름으로 사용한다. */
+  username: string | null;
   account_id: string;
   profile_image_url: string | null;
   content: string;

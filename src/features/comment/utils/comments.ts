@@ -30,13 +30,16 @@ export const normalizeCommentResponse = (input: unknown, postId: number, single 
     const { value, parent } = pending.pop()!;
     if (!value || typeof value !== 'object') throw new Error('댓글 응답 형식이 올바르지 않습니다.');
     const item = value as Record<string, unknown>;
-    if (item.parent_comment_id !== parent || !Array.isArray(item.replies)) throw new Error('댓글의 부모 정보가 일치하지 않습니다.');
+    // replies는 명세상 선택 배열이다. 생략은 답글 없음으로 처리하되 null은 허용하지 않는다.
+    const replies = item.replies === undefined ? [] : item.replies;
+    if (item.parent_comment_id !== parent || !Array.isArray(replies)) throw new Error('댓글의 부모 정보가 일치하지 않습니다.');
+    if (item.author_image_url !== null && typeof item.author_image_url !== 'string') throw new Error('댓글 작성자 이미지 응답이 올바르지 않습니다.');
     flat.push({ ...item, user_id: item.author_id, username: item.author_username,
       account_id: item.author_account_id, profile_image_url: item.author_image_url,
       content: item.is_deleted === true && item.content === null ? '' : item.content,
       is_blurred: false, report_count: 0, replies: [] });
-    if (parent !== null && item.replies.length) throw new Error('대댓글은 최대 2단계입니다.');
-    for (const reply of item.replies) pending.push({ value: reply, parent: item.id as number });
+    if (parent !== null && replies.length) throw new Error('대댓글은 최대 2단계입니다.');
+    for (const reply of replies) pending.push({ value: reply, parent: item.id as number });
   }
   return normalizeComments(flat, postId);
 };
@@ -60,14 +63,19 @@ export const normalizeComments = (input: unknown, postId: number): CommentEntity
     if (item.post_id !== postId) throw new Error('다른 게시글의 댓글이 포함되어 있습니다.');
     if (item.parent_comment_id !== null) validateCommentId(item.parent_comment_id as number);
     if (parent !== undefined && item.parent_comment_id !== parent) throw new Error('대댓글의 부모 정보가 일치하지 않습니다.');
-    for (const key of ['content', 'username', 'account_id', 'created_at', 'updated_at']) {
+    for (const key of ['content', 'account_id', 'created_at', 'updated_at']) {
       if (typeof item[key] !== 'string') throw new Error('댓글 응답의 필수 정보가 없습니다.');
     }
+
+    // 닉네임 미설정(null)은 정상 응답이다. 원댓글·답글의 조회와 작성·수정에 공통 적용한다.
+    // 필드 누락(undefined)과 다른 타입은 여전히 거부하여 계약 오류를 숨기지 않는다.
+    if (item.username !== null && typeof item.username !== 'string') throw new Error('댓글 작성자 닉네임 응답이 올바르지 않습니다.');
+
     if (typeof item.is_deleted !== 'boolean' || typeof item.is_blurred !== 'boolean') throw new Error('댓글 표시 상태가 올바르지 않습니다.');
     if (item.replies !== undefined && !Array.isArray(item.replies)) throw new Error('대댓글 응답 형식이 올바르지 않습니다.');
     const comment: CommentEntity = {
       id: item.id as number, post_id: postId, user_id: item.user_id as number,
-      username: item.username as string, account_id: item.account_id as string,
+      username: item.username as string | null, account_id: item.account_id as string,
       profile_image_url: typeof item.profile_image_url === 'string' ? item.profile_image_url : null,
       content: item.is_deleted || item.is_blurred ? '' : item.content as string,
       parent_comment_id: item.parent_comment_id as number | null,

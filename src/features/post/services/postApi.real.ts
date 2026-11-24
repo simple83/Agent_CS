@@ -59,7 +59,7 @@ const buildPostQuery = (params: PostQueryParams = {}) => {
 };
 
 /**
- * 작성/수정 요청의 공통 multipart 직렬화다. undefined 필드는 생략하고 이미지는 반복 키로 넣는다.
+ * 작성/수정 요청의 공통 multipart 직렬화다. undefined 필드는 생략하고 배열은 반복 키로 넣는다.
  * Content-Type은 직접 지정하지 않아 브라우저가 올바른 boundary를 붙이게 한다.
  * image_ids는 새 파일과 같은 순서, keep_image_ids는 유지할 기존 이미지 ID로 전송한다.
  */
@@ -68,8 +68,13 @@ const appendPostFormData = (
   params: CreatePostParams | UpdatePostParams,
 ) => {
   validatePostInput(params);
-  if (params.image_ids !== undefined) formData.append('image_ids', JSON.stringify(params.image_ids));
-  if ('keep_image_ids' in params && params.keep_image_ids !== undefined) formData.append('keep_image_ids', JSON.stringify(params.keep_image_ids));
+  params.image_ids?.forEach((id) => formData.append('image_ids', id));
+  if ('keep_image_ids' in params && params.keep_image_ids !== undefined) {
+    // 반복 키는 빈 배열을 표현할 수 없다. 확정 문서의 [] 표기로 전체 삭제와 생략(유지)을 구분한다.
+    // 백엔드가 JSON 배열 지원을 없애면 명시적 삭제 방식의 추가 합의가 필요하다.
+    if (params.keep_image_ids.length === 0) formData.append('keep_image_ids', '[]');
+    else params.keep_image_ids.forEach((id) => formData.append('keep_image_ids', String(id)));
+  }
   if (params.title !== undefined) formData.append('title', params.title);
   if (params.content !== undefined) formData.append('content', params.content);
 
@@ -78,8 +83,10 @@ const appendPostFormData = (
   });
 
   if (params.hashtags !== undefined) {
-    // 확정 계약은 반복 키와 JSON 배열 문자열을 모두 허용한다.
-    formData.append('hashtags', JSON.stringify(normalizeTags(params.hashtags)));
+    const tags = normalizeTags(params.hashtags);
+    // []는 태그 전체 제거를 뜻하므로 키를 생략하지 않는다. 값이 있으면 각각 전송한다.
+    if (tags.length === 0) formData.append('hashtags', '[]');
+    else tags.forEach((tag) => formData.append('hashtags', tag));
   }
 };
 
