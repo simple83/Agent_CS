@@ -1,19 +1,54 @@
 import { ApiError } from '../../../shared/services/ApiError';
 import type { AuthApi } from '../types/authApi.types';
+import { validateSignup } from '../utils/signup';
+import { deriveMockPassword } from '../../../shared/mocks/mockPassword';
 import {
   MOCK_USERS, readMockDatabase, saveMockDatabase, waitForMockRequest,
 } from '../../../shared/mocks/mockStore';
 
 /** 네트워크 없이 로그인 계약을 재현한다. 평문 시연 계정과 localStorage 세션은 개발 전용이다. */
 export const mockAuthApi: AuthApi = {
+  /**
+   * 가입 계약과 중복 아이디 오류를 재현한다. 세션은 만들지 않고 프로필의 임시 표시명은 아이디로 사용한다.
+   * 비동기 비밀번호 처리 후 DB를 다시 읽어 같은 탭의 연속 가입이나 다른 데이터 변경을 덮어쓰지 않는다.
+   */
+  async signup(request) {
+    validateSignup(request);
+    await waitForMockRequest();
+
+    const exists = () => MOCK_USERS.some((user) => user.account_id === request.account_id)
+      || readMockDatabase().users.some((user) => user.account_id === request.account_id);
+    if (exists()) throw new ApiError('이미 사용 중인 아이디입니다. 다른 아이디를 입력해주세요.', 409);
+
+    const salt = crypto.randomUUID();
+    const hash = await deriveMockPassword(request.password, salt);
+    // 파생값 생성 중 같은 아이디로 가입한 요청이 먼저 저장되었을 수 있다.
+    if (exists()) throw new ApiError('이미 사용 중인 아이디입니다. 다른 아이디를 입력해주세요.', 409);
+    const data = readMockDatabase();
+    const id = data.users.reduce((max, user) => Math.max(max, user.id), 102) + 1;
+    const createdAt = new Date().toISOString();
+    data.users.push({ id, account_id: request.account_id, username: request.account_id, created_at: createdAt,
+      password_salt: salt, password_hash: hash });
+    saveMockDatabase(data);
+
+    return { user_id: id, account_id: request.account_id, created_at: createdAt };
+  },
+
   /** 계정을 대조하고 액세스 1시간/갱신 7일 세션을 발급한다. 만료된 기존 세션은 정리한다. */
   async login(credentials) {
     await waitForMockRequest();
-    const user = MOCK_USERS.find((item) => item.account_id === credentials.account_id
+    const example = MOCK_USERS.find((item) => item.account_id === credentials.account_id
       && item.password === credentials.password);
+    const registered = readMockDatabase().users.find((item) => item.account_id === credentials.account_id);
+    const user = example ?? (registered
+      && await deriveMockPassword(credentials.password, registered.password_salt) === registered.password_hash ? registered : undefined);
     if (!user) throw new Error('아이디 또는 비밀번호를 확인해주세요.');
 
     const data = readMockDatabase();
+    // 비밀번호 검사 중 Mock 데이터가 초기화되면 삭제된 계정의 세션을 새로 만들지 않는다.
+    if (!example && !data.users.some((item) => item.id === user.id && item.password_hash === registered?.password_hash)) {
+      throw new Error('계정 정보가 변경되었습니다. 다시 로그인해주세요.');
+    }
     const session = {
       user_id: user.id,
       access_token: `mock-access-${crypto.randomUUID()}`,

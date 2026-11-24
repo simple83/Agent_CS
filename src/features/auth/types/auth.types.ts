@@ -1,3 +1,16 @@
+/** 회원가입 요청. 확인용 비밀번호는 화면에서만 비교하고 서버에 전송하지 않는다. */
+export interface SignupRequest {
+  account_id: string;
+  password: string;
+}
+
+/** 가입 완료 정보이며 인증 토큰은 포함하지 않는다. 로그인은 별도 요청으로 처리한다. */
+export interface SignupResponse {
+  user_id: number;
+  account_id: string;
+  created_at: string;
+}
+
 /* 로그인 요청 본문. 비밀번호는 변형하지 않고 서버에 전달한다. */
 export interface LoginRequest {
   account_id: string;

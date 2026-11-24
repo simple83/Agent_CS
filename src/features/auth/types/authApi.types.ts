@@ -1,9 +1,12 @@
 import type {
-  DetailResponse, LoginRequest, LoginResponse, LogoutRequest, RefreshRequest, RefreshResponse,
+  DetailResponse, LoginRequest, LoginResponse, LogoutRequest, RefreshRequest, RefreshResponse, SignupRequest, SignupResponse,
 } from './auth.types';
 
 /* 실제 HTTP와 Mock 구현이 함께 만족해야 하는 인증 서비스 계약이다. */
 export interface AuthApi {
+  /** 아이디와 비밀번호로 계정을 생성한다. 토큰 저장이나 자동 로그인은 하지 않는다. */
+  signup(request: SignupRequest): Promise<SignupResponse>;
+
   /* 자격 증명을 검사하고 새 로그인 세션을 발급한다. */
   login(credentials: LoginRequest): Promise<LoginResponse>;
 

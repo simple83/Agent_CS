@@ -7,6 +7,7 @@ import {
 } from 'react-router';
 
 import { LoginPage } from './pages/LoginPage'
+import { SignupPage } from './pages/SignupPage';
 import { PostListPage } from './pages/PostListPage';
 import { PostCreatePage } from './pages/PostCreatePage';
 import { PostEditPage } from './pages/PostEditPage';
@@ -37,6 +38,8 @@ function App() {
           path="/login"
           element={<LoginPage />}
         />
+
+        <Route path="/signup" element={<SignupPage />} />
 
         <Route
           path="/posts"

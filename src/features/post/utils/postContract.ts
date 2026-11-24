@@ -49,9 +49,15 @@ export const parsePostSummary = (value: unknown): PostSummary => {
   for (const key of ['id', 'author_id', 'like_count', 'comment_count', 'view_count']) {
     if (!Number.isSafeInteger(item[key]) || Number(item[key]) < (key === 'id' || key === 'author_id' ? 1 : 0)) throw new Error('게시글 숫자 응답이 올바르지 않습니다.');
   }
-  for (const key of ['title', 'author_account_id', 'author_username', 'created_at', 'updated_at']) {
+  for (const key of ['title', 'author_account_id', 'created_at', 'updated_at']) {
     if (typeof item[key] !== 'string') throw new Error('게시글 필수 정보가 없습니다.');
   }
+
+  // 실제 서버는 닉네임 미설정 계정을 null로 반환한다. 정상적인 null은 보존하되,
+  // 필드 누락(undefined)이나 숫자·객체 등 계약에 없는 값은 계속 차단한다.
+  // 목록·상세뿐 아니라 작성·수정 응답도 이 검증을 거치므로 저장 성공을 실패로 오인하지 않게 한다.
+  if (item.author_username !== null && typeof item.author_username !== 'string') throw new Error('게시글 작성자 닉네임 응답이 올바르지 않습니다.');
+
   if (item.author_image_url !== null && typeof item.author_image_url !== 'string') throw new Error('작성자 이미지 응답이 올바르지 않습니다.');
   if (!Array.isArray(item.hashtags) || item.hashtags.some((tag) => !tag || !Number.isSafeInteger(tag.id) || typeof tag.name !== 'string')) throw new Error('태그 응답이 올바르지 않습니다.');
   return { id: item.id, title: item.title, author_id: item.author_id, author_account_id: item.author_account_id,

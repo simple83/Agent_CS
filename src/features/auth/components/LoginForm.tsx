@@ -2,6 +2,7 @@ import styles from './LoginForm.module.css';
 import type { FC, FormEvent } from 'react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { Link } from 'react-router';
 
 interface LoginFormProps {
   onLoggedIn?: () => void;
@@ -21,7 +22,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
   const handleLoginSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!accountId.trim() || !password.trim()) {
+    if (!accountId.trim() || !password) {
       alert('아이디와 비밀번호를 모두 입력해주세요.');
       return;
     }
@@ -46,6 +47,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
       <form onSubmit={handleLoginSubmit} className={styles.form}>
         <input 
           type="text" 
+          aria-label="아이디" autoComplete="username"
           placeholder="아이디(account_id)" 
           value={accountId} 
           onChange={(e) => setAccountId(e.target.value)} 
@@ -55,6 +57,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
 
         <input 
           type="password" 
+          aria-label="비밀번호" autoComplete="current-password"
           placeholder="비밀번호" 
           value={password} 
           onChange={(e) => setPassword(e.target.value)} 
@@ -77,6 +80,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
         )}
 
       </form>
+      <p className={styles.help}>계정이 없으신가요? <Link className={styles.link} to="/signup">회원가입</Link></p>
     </div>
   );
 };

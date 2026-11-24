@@ -15,7 +15,8 @@ export interface PostSummary {
   title: string;
   author_id: number;
   author_account_id: string;
-  author_username: string;
+  /** 닉네임을 설정하지 않은 계정은 null이다. 화면에는 author_account_id를 대신 표시한다. */
+  author_username: string | null;
   author_image_url: string | null;
   hashtags: Hashtag[];
   like_count: number;

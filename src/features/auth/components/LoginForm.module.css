@@ -25,6 +25,29 @@
   gap: 12px;
 }
 
+/* 가입 화면도 로그인 화면과 같은 입력 스타일을 사용하며 전역 label/p 스타일에는 영향을 주지 않는다. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.help {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.link {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
 .input {
   width: 100%;
   height: 52px;

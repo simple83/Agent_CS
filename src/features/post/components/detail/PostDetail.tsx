@@ -53,7 +53,8 @@ export const PostDetail = ({ postId, onEdit, onDeleted }: PostDetailProps) => {
         <h1 className={styles.title}>{post.title}</h1>
 
         <div className={styles.author}>
-          <span>{post.author_username}</span>
+          {/* 닉네임 미설정 계정도 목록과 동일하게 계정 ID로 작성자를 식별한다. */}
+          <span>{post.author_username || post.author_account_id}</span>
           <span>@{post.author_account_id}</span>
         </div>
 

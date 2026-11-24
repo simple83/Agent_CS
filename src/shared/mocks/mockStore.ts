@@ -22,15 +22,30 @@ export interface MockSession {
   refresh_expires_at: number;
 }
 
+/** Mock에서 가입한 사용자. 비밀번호 원문 대신 계정별 salt와 파생 검증값만 저장한다. */
+export interface MockRegisteredUser {
+  id: number;
+  account_id: string;
+  username: string;
+  created_at: string;
+  password_salt: string;
+  password_hash: string;
+}
+
 /** 하나의 저장소 키에 직렬화하는 시연 DB. version은 저장 구조 변경 시 호환성 판단에 사용한다. */
 export interface MockDatabase {
   version: 1;
+  users: MockRegisteredUser[];
   posts: PostEntity[];
   sessions: MockSession[];
   // 기본 좋아요 수는 예시 합계이며, 이 맵에는 시연 계정이 추가한 좋아요만 기록한다.
   likes: Record<string, number[]>;
   comments: CommentEntity[];
 }
+
+/** 고정 시연 계정과 브라우저에서 가입한 계정을 같은 사용자 조회 경로로 다룬다. */
+export const findMockUser = (data: Pick<MockDatabase, 'users'>, id: number) =>
+  MOCK_USERS.find((user) => user.id === id) ?? data.users?.find((user) => user.id === id);
 
 /**
  * 메뉴 표시용으로 현재 액세스 토큰과 실제 Mock 세션의 사용자·만료 시간을 대조한다.
@@ -48,7 +63,7 @@ export const getActiveMockUserId = (): number | null => {
     const session = data.sessions.find((item: MockSession | null) => item?.access_token === token);
     if (!session || !Number.isFinite(session.expires_at) || session.expires_at <= Date.now()) return null;
 
-    const user = MOCK_USERS.find((item) => item.id === session.user_id);
+    const user = findMockUser(data, session.user_id);
     return user && user.id === authStorage.getUserId() ? user.id : null;
   } catch {
     return null;
@@ -81,7 +96,7 @@ const recountComments = (data: MockDatabase) => {
 export const readMockDatabase = (): MockDatabase => {
   const stored = localStorage.getItem(DATABASE_KEY);
   if (!stored) {
-    const data: MockDatabase = { version: 1, posts: structuredClone(MOCK_POSTS), sessions: [], likes: {}, comments: createInitialComments() };
+    const data: MockDatabase = { version: 1, users: [], posts: structuredClone(MOCK_POSTS), sessions: [], likes: {}, comments: createInitialComments() };
     recountComments(data);
     return data;
   }
@@ -91,6 +106,10 @@ export const readMockDatabase = (): MockDatabase => {
       || !data.likes || typeof data.likes !== 'object' || Array.isArray(data.likes)) {
       throw new Error('Invalid mock database');
     }
+
+    // 가입 기능 도입 전의 저장소에는 users가 없다. 기존 글·댓글·세션을 유지하고 다음 저장부터 함께 기록한다.
+    if (data.users === undefined) data.users = [];
+    else if (!Array.isArray(data.users)) throw new Error('Invalid mock users');
     // 구버전의 상단 첨부를 본문 끝에 옮겨 이미지 위치 계약으로 이행한다. 글/댓글/세션은 초기화하지 않는다.
     let migrated = false;
     let imageId = Math.max(0, ...data.posts.flatMap((post) => (post.images ?? []).map((image) => image.id))) + 1;
@@ -159,7 +178,7 @@ export const requireMockUser = (data: MockDatabase) => {
   if (!session || session.expires_at <= Date.now()) {
     throw new Error('인증 토큰이 없거나 만료되었습니다. Mock 계정으로 로그인해주세요.');
   }
-  const user = MOCK_USERS.find((item) => item.id === session.user_id);
+  const user = findMockUser(data, session.user_id);
   if (!user) throw new Error('존재하지 않는 Mock 사용자입니다.');
   return user;
 };

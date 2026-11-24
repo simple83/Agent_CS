@@ -265,6 +265,44 @@ test('확정 문서의 목록·상세·생성·수정·좋아요 응답을 그�
   }
 });
 
+// 운영 서버의 닉네임 미설정 응답을 재현한다. 실제 서버에 글을 만들지 않고
+// 목록·상세·저장 응답을 모두 검사해 HTTP 성공 뒤 파싱만 실패하는 회귀를 막는다.
+test('닉네임이 null인 계정의 게시글 목록·상세·작성·수정 응답을 허용한다', async () => {
+  real.authStorage.saveLogin({ access_token: 'token', refresh_token: 'refresh', user_id: 1, account_id: 'user' });
+  const cases = [
+    ['GET /posts', () => real.postApi.getPosts()],
+    ['GET /posts/{post_id}', () => real.postApi.getPost(detailFixture.id)],
+    ['POST /posts', () => real.postApi.createPost({ title: '제목', content: '본문' })],
+    ['PATCH /posts/{post_id}', () => real.postApi.updatePost(detailFixture.id, { title: '수정' })],
+  ];
+
+  for (const [key, request] of cases) {
+    const fixture = contract[key];
+    const payload = Array.isArray(fixture)
+      ? fixture.map((post) => ({ ...post, author_username: null }))
+      : { ...fixture, author_username: null };
+    let requestCount = 0;
+    globalThis.fetch = async () => {
+      requestCount += 1;
+      return Response.json(payload, { status: key === 'POST /posts' ? 201 : 200 });
+    };
+
+    assert.deepEqual(await request(), payload, key);
+    assert.equal(requestCount, 1, '정상 응답을 다시 요청하지 않아야 한다');
+  }
+});
+
+// null 허용이 필수 필드 누락이나 잘못된 타입까지 무시하는 변경으로 확대되지 않도록 검사한다.
+test('게시글 닉네임 필드 누락·잘못된 타입과 다른 필수정보 누락은 계속 거부한다', async () => {
+  for (const invalid of [undefined, 123, {}, []]) {
+    globalThis.fetch = async () => Response.json([{ ...contract['GET /posts'][0], author_username: invalid }]);
+    await assert.rejects(real.postApi.getPosts(), /작성자 닉네임 응답/);
+  }
+
+  globalThis.fetch = async () => Response.json([{ ...contract['GET /posts'][0], author_username: null, title: undefined }]);
+  await assert.rejects(real.postApi.getPosts(), /필수 정보/);
+});
+
 test('실제 refresh는 갱신 토큰을 보존하고 logout은 refresh JSON만 전송한다', async () => {
   const session = contract['POST /auth/login'];
   real.authStorage.saveLogin(session);
@@ -377,4 +415,73 @@ test('이미지 파일을 읽는 사이 계정이 바뀌면 다른 사용자 명
   finish(new Uint8Array([1, 2, 3]).buffer);
   await assert.rejects(pending, /로그인 상태가 변경/);
   assert.equal(mock.store.readMockDatabase().posts.length, 3);
+});
+
+
+test('실제 회원가입은 확정 JSON과 201 응답을 사용하고 토큰·확인 비밀번호를 전송하지 않는다', async () => {
+  const body = { account_id: 'testuser', password: '  securepassword  ' };
+  real.authStorage.saveLogin({ access_token: 'keep-access', refresh_token: 'keep-refresh', user_id: 7, account_id: 'existing' });
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, 'https://backend.example.test/api/auth/signup');
+    assert.equal(options.method, 'POST'); assert.equal(options.headers['Content-Type'], 'application/json');
+    assert.equal(options.headers.Authorization, undefined);
+    assert.deepEqual(JSON.parse(options.body), body);
+    return Response.json(contract['POST /auth/signup'], { status: 201 });
+  };
+  assert.deepEqual(await real.authApi.signup({ ...body, password_confirmation: body.password }), contract['POST /auth/signup']);
+  assert.equal(real.authStorage.getAccessToken(), 'keep-access');
+  assert.equal(real.authStorage.getRefreshToken(), 'keep-refresh');
+});
+
+test('회원가입 제한과 중복·검증·서버 오류를 구분하며 검증 응답의 비밀번호를 노출하지 않는다', async () => {
+  const valid = { account_id: 'testuser', password: 'securepassword' };
+  for (const api of [real.authApi, mock.authApi]) {
+    for (const account_id of ['abc', 'a'.repeat(31), 'Upper', 'with-dash', ' 공백 ', '한글아이디']) {
+      await assert.rejects(api.signup({ ...valid, account_id }), /아이디/);
+    }
+    for (const password of ['short', '😀'.repeat(129)]) await assert.rejects(api.signup({ ...valid, password }), /8~128/);
+  }
+  for (const [status, message] of [[409, /이미 사용 중/], [422, /가입 조건/], [500, /회원가입에 실패/]]) {
+    globalThis.fetch = async () => Response.json({ detail: [{ loc: ['body', 'password'], input: 'PRIVATE_PASSWORD' }] }, { status });
+    await assert.rejects(real.authApi.signup(valid), (error) => error.status === status && message.test(error.message) && !error.message.includes('PRIVATE_PASSWORD'));
+  }
+  globalThis.fetch = async () => Response.json({ wrong: 'shape' }, { status: 201 });
+  await assert.rejects(real.authApi.signup(valid), /가입 응답/);
+  await assert.rejects(unconfiguredReal.authApi.signup(valid), /실제 API 주소가 없습니다/);
+});
+
+test('Mock 가입 계정은 새로고침 후 로그인·글·댓글 작성이 가능하고 비밀번호 원문은 저장하지 않는다', async () => {
+  const credentials = { account_id: 'new_student', password: '😀'.repeat(128) };
+  const before = mock.store.readMockDatabase();
+  const registered = await mock.authApi.signup(credentials);
+  assert.equal(mock.authStorage.getAccessToken(), null);
+  assert.deepEqual(Object.keys(registered).sort(), ['account_id', 'created_at', 'user_id']);
+  assert.deepEqual(mock.store.readMockDatabase().posts, before.posts);
+  assert.equal(mock.store.readMockDatabase().sessions.length, 0);
+  assert.equal(localStorage.getItem('agent-cs:mock:v1:database').includes(credentials.password), false);
+  await assert.rejects(mock.authApi.signup(credentials), (error) => error.status === 409);
+  await assert.rejects(mock.authApi.login({ ...credentials, password: 'wrongpassword' }), /비밀번호/);
+  const reloaded = await loadMode('mock');
+  const session = await reloaded.authApi.login(credentials);
+  reloaded.authStorage.saveLogin(session);
+  assert.equal(session.user_id, registered.user_id);
+  assert.equal(reloaded.store.getActiveMockUserId(), registered.user_id);
+  const post = await reloaded.postApi.createPost({ title: '새 가입자의 글', content: '본문' });
+  assert.equal(post.author_id, registered.user_id);
+  const { commentApi } = await servers.at(-1).ssrLoadModule('/src/features/comment/services/commentApi.ts');
+  const comment = await commentApi.createComment(post.id, '새 가입자의 댓글');
+  assert.equal(comment.user_id, registered.user_id);
+  reloaded.store.resetMockData();
+  await assert.rejects(reloaded.authApi.login(credentials), /비밀번호/);
+});
+
+test('같은 아이디의 동시 Mock 가입은 계정을 하나만 저장하며 예전 DB도 초기화 없이 확장한다', async () => {
+  const old = mock.store.readMockDatabase(); delete old.users;
+  localStorage.setItem('agent-cs:mock:v1:database', JSON.stringify(old));
+  const credentials = { account_id: 'same_account', password: 'testpassword' };
+  const results = await Promise.allSettled([mock.authApi.signup(credentials), mock.authApi.signup(credentials)]);
+  assert.equal(results.filter((item) => item.status === 'fulfilled').length, 1);
+  assert.equal(results.find((item) => item.status === 'rejected').reason.status, 409);
+  assert.equal(mock.store.readMockDatabase().users.length, 1);
+  assert.deepEqual(mock.store.readMockDatabase().posts, old.posts);
 });
