@@ -9,7 +9,9 @@ export const LoginPage = () => {
   const returnTo = getLoginReturnTo(location.state);
 
   return <>
-    {returnTo !== '/posts' && <p role="status">게시글을 작성하려면 먼저 로그인해주세요. 로그인 후 작성 화면으로 돌아갑니다.</p>}
+    {location.state?.withdrawn === true && <p role="status">회원 탈퇴가 완료되었습니다.</p>}
+    {returnTo.startsWith('/posts/create') && <p role="status">게시글을 작성하려면 먼저 로그인해주세요. 로그인 후 작성 화면으로 돌아갑니다.</p>}
+    {returnTo === '/profile' && <p role="status">내 프로필을 보려면 먼저 로그인해주세요.</p>}
     <LoginForm returnTo={returnTo} onLoggedIn={() => navigate(returnTo, { replace: true })} />
   </>;
 };

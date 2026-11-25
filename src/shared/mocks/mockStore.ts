@@ -2,6 +2,7 @@ import { imageMarkdown } from '../components/richText/markdownImages';
 import { MOCK_POSTS } from '../../features/post/mocks/mockPosts';
 import type { PostEntity } from '../../features/post/types/post.types';
 import type { CommentEntity } from '../../features/comment/types/comment.types';
+import type { UserProfile } from '../../features/profile/types/profile.types';
 import { authStorage } from '../services/authStorage';
 
 const DATABASE_KEY = 'agent-cs:mock:v1:database';
@@ -36,6 +37,8 @@ export interface MockRegisteredUser {
 export interface MockDatabase {
   version: 1;
   users: MockRegisteredUser[];
+  /** 구버전 DB에는 없으므로 선택 필드로 추가한다. 비활성 계정 정보도 보존해 재로그인을 막는다. */
+  profiles?: Record<string, UserProfile>;
   posts: PostEntity[];
   sessions: MockSession[];
   // 기본 좋아요 수는 예시 합계이며, 이 맵에는 시연 계정이 추가한 좋아요만 기록한다.
@@ -44,8 +47,22 @@ export interface MockDatabase {
 }
 
 /** 고정 시연 계정과 브라우저에서 가입한 계정을 같은 사용자 조회 경로로 다룬다. */
-export const findMockUser = (data: Pick<MockDatabase, 'users'>, id: number) =>
-  MOCK_USERS.find((user) => user.id === id) ?? data.users?.find((user) => user.id === id);
+export const findMockUser = (data: Pick<MockDatabase, 'users' | 'profiles'>, id: number) => {
+  const user = MOCK_USERS.find((item) => item.id === id) ?? data.users?.find((item) => item.id === id);
+  const profile = data.profiles?.[id];
+  if (!user || profile?.is_active === false) return undefined;
+  return { ...user, username: profile?.username ?? user.username };
+};
+
+/** 아직 프로필을 수정하지 않은 고정/가입 계정도 같은 응답 구조로 조회한다. 비밀번호는 반환하지 않는다. */
+export const getMockProfile = (data: MockDatabase, id: number): UserProfile => {
+  const user = findMockUser(data, id);
+  if (!user) throw new Error('존재하지 않거나 탈퇴한 사용자입니다.');
+  return data.profiles?.[id] ?? { id: user.id, account_id: user.account_id, username: user.username,
+    email: null, bio: null, profile_image_url: null, is_active: true,
+    created_at: 'created_at' in user ? user.created_at : '2026-07-24T00:00:00Z',
+    updated_at: 'created_at' in user ? user.created_at : '2026-07-24T00:00:00Z' };
+};
 
 /**
  * 메뉴 표시용으로 현재 액세스 토큰과 실제 Mock 세션의 사용자·만료 시간을 대조한다.

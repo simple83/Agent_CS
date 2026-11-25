@@ -12,6 +12,7 @@ import { PostListPage } from './pages/PostListPage';
 import { PostCreatePage } from './pages/PostCreatePage';
 import { PostEditPage } from './pages/PostEditPage';
 import { AppNavigation } from './features/auth/components/AppNavigation';
+import { ProfilePage } from './pages/ProfilePage';
 
 // 상세 페이지의 Markdown/하이라이트 청크를 필요할 때 불러온다.
 const PostDetailPage = lazy(() =>
@@ -40,6 +41,7 @@ function App() {
         />
 
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
 
         <Route
           path="/posts"

@@ -1,0 +1,10 @@
+/* 프로필 화면만 적용되는 배치다. 다른 폼·게시글 본문에 하위 태그 스타일을 전파하지 않는다. */
+.page { max-width: 680px; margin: 24px auto; padding: 0 20px 40px; }
+.form { display: flex; flex-direction: column; gap: 14px; }
+.identity { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; margin-bottom: 24px; }
+.identity dd { margin: 0; overflow-wrap: anywhere; }
+.avatar, .placeholder { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; }
+.placeholder { display: grid; place-items: center; background: var(--accent-bg); font-size: 32px; }
+.withdrawal { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--border); }
+.withdrawal p { line-height: 1.6; }
+.danger { color: var(--danger); border-color: currentColor; }

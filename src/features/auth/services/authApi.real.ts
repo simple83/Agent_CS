@@ -14,6 +14,7 @@ import type { AuthApi } from '../types/authApi.types';
 import { realApiUrl } from '../../../shared/config/apiMode';
 import { validateSignup } from '../utils/signup';
 import { parseLoginResponse, parseRefreshResponse } from '../utils/authContract';
+import { authStorage } from '../../../shared/services/authStorage';
 
 /* 오류 응답의 문자열 detail을 우선 사용하고, JSON이 아니거나 구조가 다르면 기본 문구를 쓴다. */
 const getErrorMessage = async (response: Response, fallback: string) => {
@@ -33,6 +34,23 @@ const getErrorMessage = async (response: Response, fallback: string) => {
 
 /* 인증 HTTP 요청만 담당한다. 토큰 저장과 화면 상태는 Hook에서 처리하며 오류는 예외로 전달한다. */
 export const realAuthApi: AuthApi = {
+  /**
+   * 탈퇴는 비밀번호를 JSON으로 보내고 성공 상태만으로 완료 처리해 재요청을 막는다.
+   * 이 API의 401은 비밀번호 불일치일 수도 있으므로 공통 401 처리로 세션을 즉시 지우지 않는다.
+   * 서버 오류 원문에는 비밀번호가 포함될 수 있어 고정 안내만 사용한다.
+   */
+  async withdraw(password) {
+    if (!password) throw new Error('현재 비밀번호를 입력해주세요.');
+    const token = authStorage.getAccessToken();
+    if (!token) throw new Error('로그인 후 이용해주세요.');
+    const response = await fetch(realApiUrl('/auth/withdraw'), {
+      method: 'DELETE', headers: { Authorization: `bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    if (!response.ok) throw new ApiError([400, 401, 403].includes(response.status)
+      ? '비밀번호와 로그인 상태를 확인해주세요.' : '회원 탈퇴에 실패했습니다. 잠시 후 다시 시도해주세요.', response.status);
+  },
+
   /**
    * 인증 없이 JSON 본문으로 가입한다. 응답에 토큰이 없으므로 인증 저장소는 변경하지 않는다.
    * 422의 상세 검증 데이터에는 입력 비밀번호가 포함될 수 있어 원문을 화면에 노출하지 않는다.

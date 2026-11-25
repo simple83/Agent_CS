@@ -15,4 +15,7 @@ export interface AuthApi {
 
   /* 지정된 세션을 무효화한다. 로컬 토큰 삭제는 호출자 책임이다. */
   logout(request: LogoutRequest): Promise<DetailResponse>;
+
+  /** 비밀번호를 확인해 계정을 비활성화한다. 성공한 현재 세션 정리는 UI에서 담당한다. */
+  withdraw(password: string): Promise<void>;
 }

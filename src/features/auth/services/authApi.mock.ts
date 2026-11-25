@@ -3,11 +3,33 @@ import type { AuthApi } from '../types/authApi.types';
 import { validateSignup } from '../utils/signup';
 import { deriveMockPassword } from '../../../shared/mocks/mockPassword';
 import {
-  MOCK_USERS, readMockDatabase, saveMockDatabase, waitForMockRequest,
+  MOCK_USERS, readMockDatabase, saveMockDatabase, waitForMockRequest, findMockUser, requireMockUser, getMockProfile,
 } from '../../../shared/mocks/mockStore';
+import { authStorage } from '../../../shared/services/authStorage';
 
 /** 네트워크 없이 로그인 계약을 재현한다. 평문 시연 계정과 localStorage 세션은 개발 전용이다. */
 export const mockAuthApi: AuthApi = {
+  /**
+   * 비밀번호 확인 뒤 해당 계정만 비활성화하고 모든 세션을 제거한다. 기존 글·댓글은 보존한다.
+   * TODO(백엔드 협의): 탈퇴자의 글·댓글 삭제/익명화 정책이 확정되면 조회 표시 정책도 맞춘다.
+   */
+  async withdraw(password) {
+    const token = authStorage.getAccessToken();
+    await waitForMockRequest();
+    if (!token || authStorage.getAccessToken() !== token) throw new Error('로그인 상태가 변경되었습니다.');
+    const user = requireMockUser(readMockDatabase());
+    const correct = 'password' in user ? password === user.password
+      : await deriveMockPassword(password, user.password_salt) === user.password_hash;
+    if (!correct) throw new ApiError('비밀번호를 확인해주세요.', 400);
+    if (authStorage.getAccessToken() !== token) throw new Error('로그인 상태가 변경되었습니다.');
+    const data = readMockDatabase();
+    if (requireMockUser(data).id !== user.id) throw new Error('로그인 상태가 변경되었습니다.');
+    data.profiles ??= {};
+    data.profiles[user.id] = { ...getMockProfile(data, user.id), is_active: false, updated_at: new Date().toISOString() };
+    data.sessions = data.sessions.filter((session) => session.user_id !== user.id);
+    saveMockDatabase(data);
+  },
+
   /**
    * 가입 계약과 중복 아이디 오류를 재현한다. 세션은 만들지 않고 프로필의 임시 표시명은 아이디로 사용한다.
    * 비동기 비밀번호 처리 후 DB를 다시 읽어 같은 탭의 연속 가입이나 다른 데이터 변경을 덮어쓰지 않는다.
@@ -46,7 +68,7 @@ export const mockAuthApi: AuthApi = {
 
     const data = readMockDatabase();
     // 비밀번호 검사 중 Mock 데이터가 초기화되면 삭제된 계정의 세션을 새로 만들지 않는다.
-    if (!example && !data.users.some((item) => item.id === user.id && item.password_hash === registered?.password_hash)) {
+    if (!findMockUser(data, user.id) || (!example && !data.users.some((item) => item.id === user.id && item.password_hash === registered?.password_hash))) {
       throw new Error('계정 정보가 변경되었습니다. 다시 로그인해주세요.');
     }
     const session = {
@@ -72,7 +94,7 @@ export const mockAuthApi: AuthApi = {
     await waitForMockRequest();
     const data = readMockDatabase();
     const session = data.sessions.find((item) => item.refresh_token === refresh_token);
-    if (!session || session.refresh_expires_at <= Date.now()) {
+    if (!session || session.refresh_expires_at <= Date.now() || !findMockUser(data, session.user_id)) {
       throw new ApiError('refresh token이 유효하지 않거나 만료되었습니다.', 401);
     }
     session.access_token = `mock-access-${crypto.randomUUID()}`;

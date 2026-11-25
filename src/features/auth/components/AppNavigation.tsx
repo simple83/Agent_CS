@@ -30,6 +30,7 @@ export const AppNavigation = () => {
       <nav className={styles.nav} aria-label="주요 메뉴">
         <NavLink className={styles.item} to="/posts" end>게시글 목록</NavLink>
         <NavLink className={styles.item} to="/posts/create">글쓰기</NavLink>
+        {loggedIn && <NavLink className={styles.item} to="/profile">내 프로필</NavLink>}
         {loggedIn ? (
           <button className={styles.item} type="button" disabled={isLoading} onClick={() => void handleLogout()}>
             {isLoading ? '로그아웃 중...' : '로그아웃'}

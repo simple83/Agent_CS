@@ -116,7 +116,7 @@ export const mockPostApi: PostApi = {
       author_id: user.id,
       author_account_id: user.account_id,
       author_username: user.username,
-      author_image_url: null,
+      author_image_url: data.profiles?.[user.id]?.profile_image_url ?? null,
       hashtags: makeHashtags(data, params.hashtags ?? []),
       like_count: 0, comment_count: 0, view_count: 0,
       created_at: now, updated_at: now,

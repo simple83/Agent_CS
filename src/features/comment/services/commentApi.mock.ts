@@ -57,7 +57,7 @@ const create = async (postId: number, content: string, parentId: number | null):
   const comment: CommentEntity = {
     id: data.comments.reduce((max, item) => Math.max(max, item.id), 0) + 1,
     post_id: postId, user_id: user.id, username: user.username, account_id: user.account_id,
-    profile_image_url: null, content, parent_comment_id: parentId, created_at: now, updated_at: now,
+    profile_image_url: data.profiles?.[user.id]?.profile_image_url ?? null, content, parent_comment_id: parentId, created_at: now, updated_at: now,
     is_deleted: false, is_blurred: false, report_count: 0,
   };
   data.comments.push(comment);
