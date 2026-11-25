@@ -241,6 +241,21 @@ test('python,fastapi 입력은 개별 hashtags로 전송하고 이미지 배열�
   assert.equal(calls[3].has('keep_image_ids'), false);
 });
 
+test('상세·작성·수정 응답의 손상 이미지 문법을 첨부 목록으로 복원하고 다음 수정에서 ID를 유지한다', async () => {
+  const url = 'https://example.test/photo.png?signature=a%2Bb';
+  const payload = { ...detailFixture, content: `앞\n\n![사진](<${url})\n\n뒤`, images: [{ id: 10, image_url: url }] };
+  real.authStorage.saveLogin({ access_token: 'token', refresh_token: 'refresh', user_id: 1, account_id: 'user' });
+  const calls = [];
+  globalThis.fetch = async (_url, options) => { calls.push(options); return Response.json(payload); };
+  const expected = `앞\n\n![사진](<${url}>)\n\n뒤`;
+  assert.equal((await real.postApi.getPost(payload.id)).content, expected);
+  assert.equal((await real.postApi.createPost({ title: '제목', content: '본문' })).content, expected);
+  assert.equal((await real.postApi.updatePost(payload.id, { content: expected, keep_image_ids: [10] })).content, expected);
+  assert.equal(calls[2].body.get('content'), expected);
+  assert.deepEqual(calls[2].body.getAll('keep_image_ids'), ['10']);
+  assert.equal(payload.content.includes('>)'), false, '원본 응답 객체를 변경하지 않는다');
+});
+
 test('명세상 생략 가능한 게시글 배열은 빈 배열로 처리하고 null과 필수 본문 누락은 거부한다', async () => {
   globalThis.fetch = async () => Response.json({ ...detailFixture, hashtags: undefined, images: undefined });
   const result = await real.postApi.getPost(detailFixture.id);

@@ -38,9 +38,14 @@ export const usePostForm = ({ onCreated, onUpdated, initialPost, initialBoardTag
   };
 
   /** 본문에 실제로 남아 있는 새 이미지만 개수에 포함한다. 파일은 서버 전송까지 메모리에 보관한다. */
-  const addImages = (files: File[]) => {
+  const addImages = (files: File[], replacingSrc?: string) => {
     const refs = new Set(imageReferences(content));
-    if (pendingImages.current.filter((image) => refs.has(image.url)).length + files.length > 10) throw new Error('새 이미지는 한 번에 10개까지 첨부할 수 있습니다.');
+    // 교체될 임시 이미지가 본문에 한 번만 쓰였다면 새 이미지 수에서 제외한다.
+    // 같은 파일을 여러 위치에 쓴 경우 나머지 참조도 업로드해야 하므로 계속 센다.
+    const replacedOnce = replacingSrc && imageReferences(content).filter((url) => url === replacingSrc).length === 1;
+    const activeImages = pendingImages.current.filter((image) => refs.has(image.url)
+      && !(replacedOnce && image.url === replacingSrc));
+    if (activeImages.length + files.length > 10) throw new Error('새 이미지는 한 번에 10개까지 첨부할 수 있습니다.');
     if (files.some((file) => !/^image\/(png|jpeg|gif|webp)$/.test(file.type))) throw new Error('PNG, JPEG, GIF, WebP 이미지를 선택해주세요.');
     const added = files.map((file) => ({ id: crypto.randomUUID(), file, url: URL.createObjectURL(file) }));
     pendingImages.current.push(...added);

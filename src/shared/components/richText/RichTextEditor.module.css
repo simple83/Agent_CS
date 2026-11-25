@@ -20,6 +20,28 @@
   margin: 12px 12px 4px;
 }
 
+/* 선택 이미지 도구는 본문 바깥에 두어 버튼 문구가 Markdown에 저장되지 않도록 한다. */
+.imageTools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--code-bg);
+}
+
+.imageName {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* 전역 선택 스타일을 만들지 않고 이 편집기 안의 선택 이미지에만 테두리를 표시한다. */
+.body img:global(.ProseMirror-selectednode) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
 .body {
   min-height: 320px;
   padding: 16px;

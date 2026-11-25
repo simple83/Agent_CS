@@ -333,6 +333,80 @@ test('삭제 Hook은 다른 계정의 요청과 언마운트 후 이동을 차�
 });
 
 
+test('선택 이미지 도구에서 교체하고 아래에 글을 넣어 저장하면 기존 파일만 교체된다', async () => {
+  await login();
+  const db = readMockDatabase();
+  const old = { id: 10, image_url: 'data:image/png;base64,cG5n' };
+  db.posts[0].images = [old];
+  db.posts[0].content = `앞 문단\n\n![old](<${old.image_url}>)뒤 문단`;
+  saveMockDatabase(db);
+  const mounted = await mountRoute('/posts/1/edit');
+  await waitFor(() => mounted.container.querySelector('[role=textbox]')?.editor);
+  const editor = mounted.container.querySelector('[role=textbox]').editor;
+  let position;
+  editor.state.doc.descendants((node, pos) => { if (node.type.name === 'image') position = pos; });
+  await act(async () => editor.commands.setNodeSelection(position));
+  assert.ok(button(mounted.container, '이미지 삭제'));
+  await act(async () => button(mounted.container, '이미지 교체').click());
+  const input = mounted.container.querySelector('[aria-label="교체할 이미지 선택"]');
+  Object.defineProperty(input, 'files', { configurable: true, value: [new File(['replacement'], 'new.png', { type: 'image/png' })] });
+  await act(async () => input.dispatchEvent(new window.Event('change', { bubbles: true })));
+  assert.equal(mounted.container.querySelector('[role=textbox] img[src]').alt, 'new.png');
+  await act(async () => button(mounted.container, '이미지 아래에 글쓰기').click());
+  await act(async () => editor.commands.insertContent('추가 문단 '));
+  await act(async () => button(mounted.container, '수정 저장').click());
+  await waitFor(() => mounted.container.querySelector('output').textContent === '/posts/1');
+  const saved = readMockDatabase().posts[0];
+  assert.equal(saved.images.length, 1);
+  assert.notEqual(saved.images[0].id, old.id);
+  assert.ok(saved.content.includes('앞 문단') && saved.content.includes('추가 문단 뒤 문단'));
+  assert.ok(!saved.content.includes('blob:') && !saved.content.includes('이미지 교체'));
+});
+
+test('교체 파일 선택 취소·잘못된 파일·대기 중 본문 변경은 원래 이미지를 보존한다', async () => {
+  await login();
+  const db = readMockDatabase();
+  const url = 'data:image/png;base64,cG5n';
+  db.posts[0].images = [{ id: 10, image_url: url }];
+  db.posts[0].content = `![old](<${url}>)뒤`;
+  saveMockDatabase(db);
+  const mounted = await mountRoute('/posts/1/edit');
+  await waitFor(() => mounted.container.querySelector('[role=textbox]')?.editor);
+  const editor = mounted.container.querySelector('[role=textbox]').editor;
+  const input = mounted.container.querySelector('[aria-label="교체할 이미지 선택"]');
+  const original = editor.getJSON();
+  for (const files of [[], [new File(['bad'], 'bad.txt', { type: 'text/plain' })]]) {
+    await act(async () => editor.commands.setNodeSelection(1));
+    await act(async () => button(mounted.container, '이미지 교체').click());
+    Object.defineProperty(input, 'files', { configurable: true, value: files });
+    await act(async () => input.dispatchEvent(new window.Event('change', { bubbles: true })));
+    assert.deepEqual(editor.getJSON(), original);
+  }
+  await act(async () => editor.commands.setNodeSelection(1));
+  await act(async () => button(mounted.container, '이미지 교체').click());
+  await act(async () => { editor.commands.setTextSelection(editor.state.doc.content.size - 1); editor.commands.insertContent('변경'); });
+  Object.defineProperty(input, 'files', { configurable: true, value: [new File(['new'], 'new.png', { type: 'image/png' })] });
+  await act(async () => input.dispatchEvent(new window.Event('change', { bubbles: true })));
+  assert.equal(mounted.container.querySelector('[role=textbox] img[src]').getAttribute('src'), url);
+  assert.match(mounted.container.textContent, /본문이 변경되었습니다/);
+});
+
+test('임시 이미지 10개 상태에서도 하나를 교체할 수 있고 중복 참조가 남으면 개수 제한을 유지한다', async () => {
+  let form;
+  function Probe() { form = usePostForm(); return null; }
+  await mount(createElement(Probe));
+  const files = Array.from({ length: 10 }, (_, i) => new File(['png'], `${i}.png`, { type: 'image/png' }));
+  let images;
+  await act(async () => {
+    images = form.addImages(files);
+    form.setContent(images.map((image) => `![사진](<${image.src}>)`).join('\n\n'));
+  });
+  assert.throws(() => form.addImages([files[0]]), /10개/);
+  assert.equal(form.addImages([files[0]], images[0].src).length, 1);
+  await act(async () => form.setContent(form.content + `\n\n![복사](<${images[0].src}>)`));
+  assert.throws(() => form.addImages([files[0]], images[0].src), /10개/);
+});
+
 test('수정 화면의 이미지 버튼으로 본문 사이에 추가하고 재편집에서 제거하면 첨부 ID도 삭제한다', async () => {
   await login();
   const db = readMockDatabase();
@@ -361,7 +435,8 @@ test('수정 화면의 이미지 버튼으로 본문 사이에 추가하고 재�
   const nextEditor = editing.container.querySelector('[role=textbox]').editor;
   let imagePosition;
   nextEditor.state.doc.descendants((node, pos) => { if (node.type.name === 'image') imagePosition = pos; });
-  await act(async () => nextEditor.commands.deleteRange({ from: imagePosition, to: imagePosition + 1 }));
+  await act(async () => nextEditor.commands.setNodeSelection(imagePosition));
+  await act(async () => button(editing.container, '이미지 삭제').click());
   await act(async () => button(editing.container, '수정 저장').click());
   await waitFor(() => editing.container.querySelector('output').textContent === '/posts/1');
   let removed;

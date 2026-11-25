@@ -1,4 +1,4 @@
-import { imageReferences } from '../../../shared/components/richText/markdownImages';
+import { imageReferences, repairPostImageMarkdown } from '../../../shared/components/richText/markdownImages';
 import type { CreatePostParams, PostEntity, PostLikeResponse, PostQueryParams, PostSummary, UpdatePostParams } from '../types/post.types';
 
 /** 소문자 정규화와 중복 제거는 서버와 동일하게 수행한다. 빈 태그/초과 길이는 조용히 버리지 않는다. */
@@ -75,7 +75,9 @@ export const parsePostDetail = (value: unknown): PostEntity => {
   const images = item.images === undefined ? [] : item.images;
   if (typeof item.content !== 'string' || typeof item.is_deleted !== 'boolean' || !Array.isArray(images)
     || images.some((image) => !image || !Number.isSafeInteger(image.id) || image.id < 1 || typeof image.image_url !== 'string')) throw new Error('게시글 상세 응답이 올바르지 않습니다.');
-  return { ...summary, content: item.content, images, is_deleted: item.is_deleted };
+  // 상세·작성·수정 응답을 같은 경계에서 복원해 편집기와 읽기 화면이 동일한 본문을 사용한다.
+  const content = repairPostImageMarkdown(item.content, images.map((image) => image.image_url));
+  return { ...summary, content, images, is_deleted: item.is_deleted };
 };
 
 /** 다른 게시글의 좋아요 응답이나 잘못된 합계는 현재 화면에 적용하지 않는다. */

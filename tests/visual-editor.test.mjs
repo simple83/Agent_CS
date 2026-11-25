@@ -21,6 +21,8 @@ const server = await createServer({
 const { createVisualEditorExtensions, insertCodeBlockBelow, serializeVisualEditor, isWebLink } =
   await server.ssrLoadModule('/src/shared/components/richText/visualEditor.ts');
 const { MarkdownContent: PostContent } = await server.ssrLoadModule('/src/shared/components/richText/MarkdownContent.tsx');
+const { imageReferences, mapMarkdownImages, imageMarkdown, repairPostImageMarkdown } = await server.ssrLoadModule('/src/shared/components/richText/markdownImages.ts');
+const { selectedImage, replaceImage, addParagraphAfterImage, deleteSelectedImage } = await server.ssrLoadModule('/src/shared/components/richText/imageEditing.ts');
 const editors = [];
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { RichTextEditorDisabledContext: PostEditorDisabledContext } = await server.ssrLoadModule('/src/shared/components/richText/RichTextEditorContext.ts');
@@ -269,7 +271,68 @@ test('댓글 모드는 일반 문단·코드·줄바꿈만 제공하며 붙여�
 });
 
 
-const { imageReferences, mapMarkdownImages, imageMarkdown } = await server.ssrLoadModule('/src/shared/components/richText/markdownImages.ts');
+
+test('첨부 주소가 확인된 닫는 괄호 누락만 복원하고 글-이미지-글을 편집·저장·표시한다', () => {
+  const url = 'https://example.test/photo(1).png?signature=a%2Bb&expires=123';
+  for (const gap of ['', ' ', '\n', '\n\n']) {
+    const bad = `앞 글${gap}![사진](<${url})${gap}뒤 글`;
+    const fixed = repairPostImageMarkdown(bad, [url]);
+    assert.deepEqual(imageReferences(fixed), [url]);
+    assert.equal(repairPostImageMarkdown(fixed, [url]), fixed);
+    const editor = makeEditor(fixed);
+    const saved = serializeVisualEditor(editor);
+    assert.deepEqual(imageReferences(saved), [url]);
+    assert.deepEqual(makeEditor(saved).getJSON(), editor.getJSON());
+    const markup = renderToStaticMarkup(createElement(PostContent, { content: saved, allowImages: true }));
+    const container = document.createElement('div'); container.innerHTML = markup;
+    assert.equal(container.querySelector('img').getAttribute('src'), url);
+    assert.match(container.textContent, /앞 글/);
+    assert.match(container.textContent, /뒤 글/);
+  }
+});
+
+test('이미지 복원은 코드 예시·HTML·링크·이스케이프 문법·일반 URL과 미확인 주소를 변경하지 않는다', () => {
+  const url = 'https://example.test/known.png';
+  const broken = `![사진](<${url})`;
+  for (const content of [
+    `\` ${broken} \``, `\`\`\`md\n${broken}\n\`\`\``, `    ${broken}`,
+    `<div>\n${broken}\n</div>`, `[${broken}](https://example.test/link)`,
+    `\\${broken}`, `!\\[사진\\](<${url})`, url, imageMarkdown('사진', url),
+  ]) assert.equal(repairPostImageMarkdown(content, [url]), content, content);
+  assert.equal(repairPostImageMarkdown(broken, []), broken);
+  assert.equal(repairPostImageMarkdown(broken, ['https://example.test/other.png']), broken);
+  const unsafe = '![사진](<javascript:alert(1))';
+  assert.equal(repairPostImageMarkdown(unsafe, ['javascript:alert(1)']), unsafe);
+});
+
+test('이미지 교체·아래 문단·삭제는 주변 글을 보존하고 실행 취소와 읽기 전용을 지킨다', () => {
+  const url = 'https://example.test/old.png';
+  const editor = makeEditor(`앞${imageMarkdown('old', url)}뒤`);
+  editor.commands.setNodeSelection(2);
+  const target = { ...selectedImage(editor), document: editor.state.doc };
+  const original = editor.getJSON();
+  assert.equal(replaceImage(editor, target, { src: 'https://example.test/new.png', alt: 'new' }), true);
+  assert.equal(editor.state.doc.textContent, '앞뒤');
+  assert.deepEqual(imageReferences(serializeVisualEditor(editor)), ['https://example.test/new.png']);
+  editor.commands.undo();
+  assert.deepEqual(editor.getJSON(), original);
+  editor.commands.setNodeSelection(2);
+  assert.equal(addParagraphAfterImage(editor), true);
+  assert.equal(editor.state.doc.child(0).textContent, '앞');
+  assert.equal(editor.state.doc.child(1).textContent, '뒤');
+  editor.commands.insertContent('추가');
+  assert.equal(editor.state.doc.child(1).textContent, '추가뒤');
+  editor.commands.setNodeSelection(2);
+  editor.setEditable(false);
+  assert.equal(deleteSelectedImage(editor), false);
+  assert.equal(addParagraphAfterImage(editor), false);
+  assert.equal(replaceImage(editor, target, { src: url, alt: '' }), false);
+  editor.setEditable(true);
+  assert.equal(replaceImage(editor, target, { src: url, alt: '' }), false, '이전 본문의 교체 대상은 사용하지 않는다');
+  assert.equal(deleteSelectedImage(editor), true);
+  assert.deepEqual(imageReferences(serializeVisualEditor(editor)), []);
+  assert.equal(editor.state.doc.textContent, '앞추가뒤');
+});
 
 test('이미지 전용 글·문단 사이 이미지·쿼리가 있는 URL을 편집하고 재저장해도 보존한다', () => {
   const url = 'https://example.test/photo(1).png?signature=a%2Bb&expires=123';

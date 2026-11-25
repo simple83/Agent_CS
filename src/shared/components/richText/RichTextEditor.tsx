@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import { RichTextEditorDisabledContext } from './RichTextEditorContext';
 import { createVisualEditorExtensions, insertCodeBlockBelow, isWebLink, serializeVisualEditor } from './visualEditor';
+import { selectedImage, canReplaceImage, replaceImage, addParagraphAfterImage, deleteSelectedImage, type ImageReplacementTarget } from './imageEditing';
 import styles from './RichTextEditor.module.css';
 import richText from './RichText.module.css';
 import syntax from './CodeSyntax.module.css';
@@ -10,8 +11,8 @@ import ui from '../../styles/Controls.module.css';
 interface RichTextEditorProps {
   /** 부모는 API에 전송할 Markdown을 보관하고 편집기는 구조화된 문서를 관리한다. */
   content: string;
-  /** 선택 파일을 부모 폼에 보관하고 편집기에 삽입할 임시 URL을 반환한다. */
-  onImageFiles?: (files: File[]) => { src: string; alt: string }[];
+  /** 선택 파일을 부모 폼에 보관한다. 교체 시 기존 src도 전달해 업로드 개수에서 교체분을 제외한다. */
+  onImageFiles?: (files: File[], replacingSrc?: string) => { src: string; alt: string }[];
   onChange: (content: string) => void;
   disabled: boolean;
   /** 댓글 등 이미지가 없는 입력창에서는 파일 선택 안내를 표시하지 않는다. */
@@ -30,6 +31,8 @@ interface RichTextEditorProps {
  */
 export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAvailable = true, label = '게시글 내용', compact = false, variant = 'post', onImageFiles }: RichTextEditorProps) => {
   const imageInput = useRef<HTMLInputElement>(null);
+  const replacementInput = useRef<HTMLInputElement>(null);
+  const replacementTarget = useRef<ImageReplacementTarget | null>(null);
   const linkPanelId = useId();
   const lastPublished = useRef(content);
   const [showLink, setShowLink] = useState(false);
@@ -81,6 +84,7 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
       orderedList: current.isActive('orderedList'),
       blockquote: current.isActive('blockquote'),
       link: current.isActive('link'),
+      image: selectedImage(current),
       undo: current.can().undo(),
       redo: current.can().redo(),
     } : null,
@@ -104,6 +108,14 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
   const addCodeBlock = () => {
     if (disabled || !editor.commands.command(insertCodeBlockBelow)) return;
     editor.view.focus();
+  };
+
+  /** 파일 선택창으로 포커스가 옮겨져도 교체 대상을 고정한다. 취소하면 본문은 변경되지 않는다. */
+  const chooseReplacement = () => {
+    const image = selectedImage(editor);
+    if (disabled || !editor.isEditable || !image) return;
+    replacementTarget.current = { position: image.position, src: image.src, document: editor.state.doc };
+    replacementInput.current?.click();
   };
 
   /** 링크 패널로 포커스가 이동해도 선택 범위는 유지된다. 기존 링크는 수정할 수 있다. */
@@ -142,15 +154,36 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
             onClick={() => imageInput.current?.click()}>이미지</button>
           <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden
             aria-label="본문 이미지 선택" disabled={disabled} onChange={(event) => {
-              // 선택 직전의 커서 위치로 돌아가 이미지를 삽입한다. 실패하면 기존 문서는 유지한다.
+              // 삽입은 선택 범위 뒤에 수행한다. 기존 이미지/글자를 교체하는 기능과 구분한다.
               try {
+                if (disabled || !editor.isEditable || !event.target.files?.length) return;
                 const items = onImageFiles(Array.from(event.target.files ?? []));
-                editor.chain().focus().insertContent(items.flatMap((attrs) => [
+                editor.chain().setTextSelection(editor.state.selection.to).insertContent(items.flatMap((attrs) => [
                   { type: 'image', attrs }, { type: 'text', text: ' ' },
                 ])).run();
-                setMessage('이미지를 선택해 Delete/Backspace로 본문에서 제거할 수 있습니다.');
+                editor.view.focus();
+                setMessage('이미지를 클릭하면 교체·삭제하거나 이미지 아래에 글을 쓸 수 있습니다.');
               } catch (error) { setMessage(error instanceof Error ? error.message : '이미지를 추가하지 못했습니다.'); }
-              event.target.value = '';
+              finally { event.target.value = ''; }
+            }} />
+          <input ref={replacementInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden
+            aria-label="교체할 이미지 선택" disabled={disabled} onChange={(event) => {
+              const target = replacementTarget.current;
+              replacementTarget.current = null;
+              try {
+                const files = Array.from(event.target.files ?? []);
+                if (!files.length) return;
+                if (disabled || !target || !canReplaceImage(editor, target)) {
+                  setMessage('본문이 변경되었습니다. 교체할 이미지를 다시 선택해주세요.');
+                  return;
+                }
+                if (files.length !== 1) throw new Error('교체할 이미지는 한 개만 선택해주세요.');
+                const [attrs] = onImageFiles(files, target.src);
+                if (!attrs || !replaceImage(editor, target, attrs)) throw new Error('이미지를 다시 선택한 뒤 교체해주세요.');
+                editor.view.focus();
+                setMessage('이미지를 교체했습니다. 게시글을 저장하면 반영됩니다.');
+              } catch (error) { setMessage(error instanceof Error ? error.message : '이미지 교체에 실패했습니다.'); }
+              finally { event.target.value = ''; }
             }} />
         </>}
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled || !state.undo} onClick={() => editor.chain().focus().undo().run()}>실행 취소</button>
@@ -167,6 +200,23 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
         <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} onClick={addCodeBlock}>코드블록</button>
         {state.codeBlock && <button className={`${ui.button} ${styles.toolButton}`} type="button" disabled={disabled} onClick={() => editor.chain().focus().exitCode().run()}>코드 아래에 문단 추가</button>}
       </div>
+
+      {variant === 'post' && state.image && <div className={styles.imageTools} role="group" aria-label="선택한 이미지 편집">
+        <span className={styles.imageName}>{state.image.alt || '선택한 이미지'}</span>
+        {onImageFiles && <button type="button" className={ui.button} disabled={disabled} onClick={chooseReplacement}>이미지 교체</button>}
+        <button type="button" className={ui.button} disabled={disabled} onClick={() => {
+          if (!disabled && deleteSelectedImage(editor)) {
+            editor.view.focus();
+            setMessage('본문에서 이미지를 제거했습니다. 실행 취소로 되돌릴 수 있습니다.');
+          }
+        }}>이미지 삭제</button>
+        <button type="button" className={ui.button} disabled={disabled} onClick={() => {
+          if (!disabled && addParagraphAfterImage(editor)) {
+            editor.view.focus();
+            setMessage('이미지 아래에서 글을 이어 쓸 수 있습니다.');
+          }
+        }}>이미지 아래에 글쓰기</button>
+      </div>}
 
       {variant === 'post' && showLink && <fieldset id={linkPanelId} className={styles.linkPanel} disabled={disabled}>
         <legend>링크 설정</legend>
