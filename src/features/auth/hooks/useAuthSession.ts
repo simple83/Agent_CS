@@ -4,7 +4,7 @@ import { isMockApi } from '../../../shared/config/apiMode';
 import { getActiveMockUserId } from '../../../shared/mocks/mockStore';
 
 /** Mock은 저장된 세션의 유효성까지 확인한다. 실제 모드의 최종 인증 판단은 서버가 담당한다. */
-const getSnapshot = () => isMockApi
+export const hasActiveAuthSession = () => isMockApi
   ? getActiveMockUserId() !== null
   : authStorage.hasActiveAccessToken();
 
@@ -13,7 +13,7 @@ const getServerSnapshot = () => false;
 
 /** 로그인/로그아웃 직후와 새로고침 후에도 공통 메뉴가 현재 저장된 세션을 반영하게 한다. */
 export const useAuthSession = () =>
-  useSyncExternalStore(authStorage.subscribe, getSnapshot, getServerSnapshot);
+  useSyncExternalStore(authStorage.subscribe, hasActiveAuthSession, getServerSnapshot);
 
 /** 메뉴와 작성자 도구에 동일한 로그인 판단을 적용해 만료된 Mock 계정의 관리 버튼도 숨긴다. */
 const getUserSnapshot = () => isMockApi

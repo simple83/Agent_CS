@@ -42,6 +42,15 @@
   outline-offset: 2px;
 }
 
+/* 브라우저 기본 이미지 끌기를 사용하되 편집 중일 때만 이동 가능함을 표시한다. */
+.body[contenteditable=true] img[src] {
+  cursor: grab;
+}
+
+.body[contenteditable=true] img[src]:active {
+  cursor: grabbing;
+}
+
 .body {
   min-height: 320px;
   padding: 16px;

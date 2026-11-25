@@ -6,10 +6,14 @@ import { createServer } from 'vite';
 
 // 입력 이벤트를 실제 React onChange로 처리하도록 DOM을 만든 뒤 react-dom을 불러온다.
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost/login' });
-for (const name of ['window', 'document', 'localStorage', 'HTMLElement', 'Node']) {
+for (const name of ['window', 'document', 'localStorage', 'HTMLElement', 'Node', 'MutationObserver', 'DOMParser']) {
   globalThis[name] = name === 'window' ? dom.window : dom.window[name];
 }
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+globalThis.cancelAnimationFrame = clearTimeout;
+dom.window.Range.prototype.getClientRects = () => [];
+dom.window.Range.prototype.getBoundingClientRect = () => new dom.window.DOMRect();
 const { createRoot } = await import('react-dom/client');
 const server = await createServer({ configFile: false, mode: 'mock',
   server: { middlewareMode: true, watch: null, hmr: false, ws: false },
@@ -20,6 +24,8 @@ const { default: App } = await server.ssrLoadModule('/src/App.tsx');
 const { useSignup } = await server.ssrLoadModule('/src/features/auth/hooks/useSignup.ts');
 const { authApi } = await server.ssrLoadModule('/src/features/auth/services/authApi.ts');
 const { authStorage } = await server.ssrLoadModule('/src/shared/services/authStorage.ts');
+const { getLoginReturnTo } = await server.ssrLoadModule('/src/features/auth/utils/loginRedirect.ts');
+const { readMockDatabase, saveMockDatabase } = await server.ssrLoadModule('/src/shared/mocks/mockStore.ts');
 const originalSignup = authApi.signup;
 const roots = new Set();
 
@@ -58,6 +64,79 @@ afterEach(async () => {
   window.history.replaceState(null, '', '/login');
 });
 after(async () => { await server.close(); dom.window.close(); });
+
+test('로그인 복귀 경로는 앱의 글쓰기 주소만 허용한다', () => {
+  assert.equal(getLoginReturnTo({ returnTo: '/posts/create?tag=%EC%A7%88%EB%AC%B8' }), '/posts/create?tag=%EC%A7%88%EB%AC%B8');
+  for (const returnTo of [null, 1, 'https://example.com', '//example.com', '/posts/create/../../login', '/posts/create-other']) {
+    assert.equal(getLoginReturnTo({ returnTo }), '/posts');
+  }
+  assert.equal(getLoginReturnTo(null), '/posts');
+});
+
+test('비로그인 글쓰기 클릭은 로그인으로 이동하고 로그인 후 선택한 말머리를 복원한다', async () => {
+  window.history.replaceState(null, '', '/posts?tag=질문');
+  const { container } = await mount();
+  await waitFor(() => [...container.querySelectorAll('button')].some((node) => node.textContent === '글쓰기'));
+  await act(async () => [...container.querySelectorAll('button')].find((node) => node.textContent === '글쓰기').click());
+  assert.equal(window.location.pathname, '/login');
+  assert.equal(container.querySelector('[role=textbox]'), null);
+  assert.match(container.textContent, /먼저 로그인/);
+  await input(container, '[aria-label="아이디"]', 'jinwoo99');
+  await input(container, '[aria-label="비밀번호"]', 'mock1234');
+  await submit(container);
+  await waitFor(() => window.location.pathname === '/posts/create' && container.querySelector('[role=textbox]'));
+  assert.equal(new URLSearchParams(window.location.search).get('tag'), '질문');
+  assert.equal(container.querySelector('select').value, '질문');
+});
+
+test('글쓰기 직접 진입도 차단하고 회원가입을 거쳐 로그인해도 작성 화면으로 복귀한다', async () => {
+  window.history.replaceState(null, '', '/posts/create?tag=모집');
+  const { container } = await mount();
+  assert.equal(window.location.pathname, '/login');
+  await act(async () => container.querySelector('a[href="/signup"]').click());
+  await input(container, '[name=account_id]', 'writer_new');
+  await input(container, '[name=password]', 'pass1234');
+  await input(container, '[name=password_confirmation]', 'pass1234');
+  await submit(container);
+  await waitFor(() => container.textContent.includes('회원가입 완료'));
+  await act(async () => [...container.querySelectorAll('a')].find((node) => node.textContent === '로그인하러 가기').click());
+  await input(container, '[aria-label="아이디"]', 'writer_new');
+  await input(container, '[aria-label="비밀번호"]', 'pass1234');
+  await submit(container);
+  await waitFor(() => window.location.pathname === '/posts/create' && container.querySelector('[role=textbox]'));
+  assert.equal(container.querySelector('select').value, '모집');
+});
+
+test('저장된 토큰이 있어도 세션이 만료되었으면 작성 폼을 열지 않는다', async () => {
+  authStorage.saveLogin(await authApi.login({ account_id: 'jinwoo99', password: 'mock1234' }));
+  const db = readMockDatabase();
+  db.sessions[0].expires_at = Date.now() - 1;
+  saveMockDatabase(db);
+  window.history.replaceState(null, '', '/posts/create');
+  const { container } = await mount();
+  assert.equal(window.location.pathname, '/login');
+  assert.equal(container.querySelector('[role=textbox]'), null);
+});
+
+test('작성 중 인증이 사라져도 제목과 본문을 유지하고 재로그인 후 계속 작성한다', async () => {
+  authStorage.saveLogin(await authApi.login({ account_id: 'jinwoo99', password: 'mock1234' }));
+  window.history.replaceState(null, '', '/posts/create');
+  const { container } = await mount();
+  await waitFor(() => container.querySelector('[role=textbox]')?.editor);
+  const editor = container.querySelector('[role=textbox]').editor;
+  await input(container, 'input[placeholder="제목을 입력해 주세요."]', '유지할 제목');
+  await act(async () => editor.commands.insertContent('유지할 본문'));
+  await act(async () => authStorage.clear());
+  assert.equal(window.location.pathname, '/posts/create');
+  assert.equal(container.querySelector('input[placeholder="제목을 입력해 주세요."]').value, '유지할 제목');
+  assert.equal(container.querySelector('[role=textbox]').editor, editor);
+  assert.match(editor.getText(), /유지할 본문/);
+  assert.match(container.textContent, /로그인이 만료/);
+  assert.equal(container.querySelector('a[target=_blank]').getAttribute('href'), '/login');
+  await act(async () => authStorage.saveLogin(await authApi.login({ account_id: 'jinwoo99', password: 'mock1234' })));
+  assert.doesNotMatch(container.textContent, /로그인이 만료/);
+  assert.match(editor.getText(), /유지할 본문/);
+});
 
 test('로그인→회원가입→완료→로그인→게시판을 실제 화면과 Mock으로 연결한다', async () => {
   const { container } = await mount();

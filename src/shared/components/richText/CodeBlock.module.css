@@ -27,6 +27,22 @@
   font-weight: 600;
 }
 
+/* 편집기에만 존재하는 이동 핸들이다. 코드 본문의 텍스트 선택·복사에는 영향을 주지 않는다. */
+.dragHandle {
+  cursor: grab;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandle[aria-disabled=true] {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
 /* 코드 도구는 어두운 배경에 맞춘 독립 컨트롤로 작성 폼 스타일을 받지 않는다. */
 .control {
   width: auto;

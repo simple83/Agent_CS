@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
+import { getLoginReturnTo } from '../utils/loginRedirect';
 import { useSignup } from '../hooks/useSignup';
 import styles from './LoginForm.module.css';
 
@@ -8,6 +9,8 @@ import styles from './LoginForm.module.css';
  * 비밀번호는 컴포넌트 메모리에만 두고 가입 성공 시 비운다. URL이나 로그인 화면에 전달하지 않는다.
  */
 export const SignupForm = () => {
+  const location = useLocation();
+  const returnTo = getLoginReturnTo(location.state);
   const [accountId, setAccountId] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
@@ -25,7 +28,7 @@ export const SignupForm = () => {
   if (registered) return <section className={styles.container}>
     <h2 className={styles.title}>회원가입 완료</h2>
     <p role="status">{registered.account_id} 계정이 만들어졌습니다. 로그인 후 이용해주세요.</p>
-    <Link className={styles.link} to="/login">로그인하러 가기</Link>
+    <Link className={styles.link} to="/login" state={{ returnTo }}>로그인하러 가기</Link>
   </section>;
 
   return <section className={styles.container}>
@@ -55,7 +58,7 @@ export const SignupForm = () => {
       <button className={styles.button} type="submit" disabled={isLoading}>
         {isLoading ? '가입 요청 중...' : '회원가입'}
       </button>
-      <Link className={styles.link} to="/login">로그인으로 돌아가기</Link>
+      <Link className={styles.link} to="/login" state={{ returnTo }}>로그인으로 돌아가기</Link>
     </form>
   </section>;
 };

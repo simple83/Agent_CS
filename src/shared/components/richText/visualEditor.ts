@@ -17,6 +17,9 @@ lowlight.registerAlias({ javascript: ['jsx'], typescript: ['tsx'] });
 
 // 문서 구조/하이라이트는 기존 확장을 유지하고 편집 화면의 코드블록 외형만 교체한다.
 const VisualCodeBlock = CodeBlockLowlight.extend({
+  // 상단 이동 핸들이 블록 전체를 선택한 뒤 이동한다. 내부 텍스트 드래그는 편집기에서 차단한다.
+  draggable: true,
+
   // Markdown 해석기가 이미 코드로 판정한 토큰을 사용한다. 원본 구분자 앞에 공백이 있는
   // 목록 내부 코드도 허용하고, 실제 코드의 들여쓰기는 token.text 그대로 보존한다.
   parseMarkdown: (token, helpers) => helpers.createNode(
@@ -123,7 +126,8 @@ const commentMarkdownReaders = [
  * 댓글 스키마에는 등록하지 않으므로 게시글의 이미지 기능이 댓글로 확장되지 않는다.
  */
 const PostImageNode = TiptapNode.create({
-  name: 'image', inline: true, group: 'inline', atom: true, draggable: false,
+  // 내부 드래그는 편집기가 보관한 노드 조각을 이동하므로 외부 HTML 이미지 허용과 무관하다.
+  name: 'image', inline: true, group: 'inline', atom: true, draggable: true,
   addAttributes: () => ({ src: { default: '' }, alt: { default: '' } }),
   parseHTML: () => [],
   renderHTML: ({ HTMLAttributes }) => ['img', {

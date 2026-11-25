@@ -38,6 +38,7 @@ const { PostListPage } = await server.ssrLoadModule('/src/pages/PostListPage.tsx
 const { PostCreatePage } = await server.ssrLoadModule('/src/pages/PostCreatePage.tsx');
 const { readMockDatabase, saveMockDatabase, failNextMockRequest } = await server.ssrLoadModule('/src/shared/mocks/mockStore.ts');
 const { getEditedPostTags, getPostTopicInput } = await server.ssrLoadModule('/src/features/post/utils/postEditor.ts');
+const { RichTextEditor } = await server.ssrLoadModule('/src/shared/components/richText/RichTextEditor.tsx');
 const originalApi = { ...postApi };
 const roots = new Set();
 
@@ -97,6 +98,184 @@ afterEach(async () => {
 });
 
 after(async () => { await server.close(); dom.window.close(); });
+
+for (const variant of ['post', 'comment']) {
+  test(`${variant}: 코드 일부 드래그는 막고 핸들로 전체 이동하면 언어·내용·실행 취소를 보존한다`, async () => {
+    const content = '앞 문단\n\n```python\nprint(1)\n  print(2)\n```\n\n```javascript\nconst x = 1;\n```\n\n뒤 문단';
+    let published = content;
+    const props = { content, onChange: (value) => { published = value; }, disabled: false, variant };
+    const mounted = await mount(createElement(RichTextEditor, props));
+    const { container } = mounted;
+    const editor = container.querySelector('[role=textbox]').editor;
+    const view = editor.view;
+    const originalCoords = view.posAtCoords;
+    const positions = [];
+    editor.state.doc.descendants((node, pos) => { if (node.type.name === 'codeBlock') positions.push(pos); });
+    const original = editor.getJSON();
+    const originalCode = editor.state.doc.nodeAt(positions[0]).toJSON();
+    const data = new Map();
+    const transfer = { files: [], clearData: () => data.clear(), setData: (key, value) => data.set(key, value),
+      getData: (key) => data.get(key) ?? '', setDragImage() {}, effectAllowed: '' };
+    const event = (type) => {
+      const result = new window.MouseEvent(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(result, 'dataTransfer', { value: transfer });
+      return result;
+    };
+    try {
+      view.posAtCoords = () => ({ pos: positions[0] + 3, inside: positions[0] });
+      await act(async () => editor.commands.setTextSelection({ from: positions[0] + 2, to: positions[0] + 6 }));
+      const partial = event('dragstart');
+      await act(async () => container.querySelector('pre code').dispatchEvent(partial));
+      assert.ok(partial.defaultPrevented);
+      assert.equal(view.dragging, null);
+      assert.equal(editor.state.selection.from, positions[0] + 2, '선택은 유지해 복사·수정을 계속할 수 있다.');
+      assert.deepEqual(editor.getJSON(), original);
+
+      // 일반 문단에서 시작해 코드 일부까지 걸친 선택도 외부로 끌어 분리할 수 없다.
+      await act(async () => editor.commands.setTextSelection({ from: 1, to: positions[0] + 4 }));
+      const spanning = event('dragstart');
+      await act(async () => view.dom.querySelector('p').dispatchEvent(spanning));
+      assert.ok(spanning.defaultPrevented);
+      assert.deepEqual(editor.getJSON(), original);
+
+      // 코드와 무관한 일반 텍스트 드래그는 기존 동작을 유지한다.
+      await act(async () => editor.commands.setTextSelection({ from: 1, to: 3 }));
+      view.posAtCoords = () => ({ pos: 2, inside: 0 });
+      const textDrag = event('dragstart');
+      await act(async () => view.dom.querySelector('p').dispatchEvent(textDrag));
+      assert.equal(textDrag.defaultPrevented, false);
+      assert.ok(view.dragging);
+      view.dragging = null;
+
+      const handle = container.querySelector('[data-drag-handle]');
+      view.posAtCoords = () => ({ pos: positions[0], inside: positions[0] });
+      await act(async () => {
+        handle.dispatchEvent(event('mousedown'));
+        handle.dispatchEvent(event('dragstart'));
+      });
+      assert.equal(editor.state.selection.node?.type.name, 'codeBlock');
+      assert.ok(view.dragging);
+      // 다른 코드 안에 넣어 두 블록이 합쳐지거나 일반 텍스트로 바뀌는 것도 막는다.
+      view.posAtCoords = () => ({ pos: positions[1] + 2, inside: positions[1] });
+      await act(async () => view.dom.dispatchEvent(event('drop')));
+      assert.deepEqual(editor.getJSON(), original);
+      assert.match(container.textContent, /다른 코드블록 바깥/);
+
+      view.posAtCoords = () => ({ pos: positions[0], inside: positions[0] });
+      await act(async () => {
+        handle.dispatchEvent(event('mousedown'));
+        handle.dispatchEvent(event('dragstart'));
+      });
+      view.posAtCoords = () => ({ pos: editor.state.doc.content.size, inside: -1 });
+      await act(async () => view.dom.dispatchEvent(event('drop')));
+      const codes = [];
+      editor.state.doc.descendants((node) => { if (node.type.name === 'codeBlock') codes.push(node.toJSON()); });
+      assert.equal(codes.length, 2);
+      assert.equal(codes[0].attrs.language, 'javascript');
+      assert.deepEqual(codes[1], originalCode);
+      assert.ok(published.indexOf('```javascript') < published.indexOf('```python'));
+      assert.doesNotMatch(published, /전체 이동|코드블록 언어/);
+      await act(async () => editor.commands.undo());
+      assert.deepEqual(editor.getJSON(), original);
+
+      await mounted.render(createElement(RichTextEditor, { ...props, disabled: true }));
+      const locked = container.querySelector('[data-drag-handle]');
+      assert.equal(locked.getAttribute('draggable'), 'false');
+      const lockedDrag = event('dragstart');
+      await act(async () => locked.dispatchEvent(lockedDrag));
+      assert.ok(lockedDrag.defaultPrevented);
+      assert.deepEqual(editor.getJSON(), original);
+    } finally { view.posAtCoords = originalCoords; }
+  });
+}
+
+/** 실제 dragstart/drop을 사용한다. jsdom에 없는 화면 좌표 계산만 문서 위치로 대체한다. */
+async function dragImage(editor, from, to, files = []) {
+  const view = editor.view;
+  const originalCoords = view.posAtCoords;
+  const data = new Map();
+  const transfer = { files, clearData: () => data.clear(), setData: (key, value) => data.set(key, value),
+    getData: (key) => data.get(key) ?? '', effectAllowed: '' };
+  const event = (type) => {
+    const result = new window.MouseEvent(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(result, 'dataTransfer', { value: transfer });
+    return result;
+  };
+  try {
+    await act(async () => {
+      editor.commands.setNodeSelection(from);
+      view.posAtCoords = () => ({ pos: from, inside: from });
+      view.nodeDOM(from).dispatchEvent(event('dragstart'));
+      assert.ok(view.dragging, '내부 이미지 드래그가 시작되어야 한다.');
+      view.posAtCoords = () => ({ pos: to, inside: to });
+      view.dom.dispatchEvent(event('drop'));
+    });
+  } finally { view.posAtCoords = originalCoords; }
+}
+
+test('이미지를 드래그해 순서를 바꾸고 실행 취소·재실행 후 저장해도 파일과 텍스트를 보존한다', async () => {
+  await login();
+  const db = readMockDatabase();
+  const first = 'data:image/png;base64,Zmlyc3Q=';
+  const second = 'data:image/png;base64,c2Vjb25k';
+  db.posts[0].images = [{ id: 10, image_url: first }, { id: 11, image_url: second }];
+  db.posts[0].content = `앞\n\n![first](<${first}>)\n\n중간\n\n![second](<${second}>)\n\n뒤`;
+  saveMockDatabase(db);
+  const { container } = await mountRoute('/posts/1/edit');
+  await waitFor(() => container.querySelector('[role=textbox]')?.editor);
+  const editor = container.querySelector('[role=textbox]').editor;
+  const original = editor.getJSON();
+  const text = editor.getText();
+  const positions = [];
+  editor.state.doc.descendants((node, pos) => { if (node.type.name === 'image') positions.push(pos); });
+  assert.equal(container.querySelector('img[src]').getAttribute('draggable'), 'true');
+  // 일부 브라우저는 내부 이미지 드래그에도 files를 제공한다. 이 경우도 새 업로드 없이 이동한다.
+  await dragImage(editor, positions[0], positions[1] + 1, [new File(['png'], 'first.png', { type: 'image/png' })]);
+  const sources = () => [...container.querySelectorAll('[role=textbox] img[src]')].map((node) => node.getAttribute('src'));
+  assert.deepEqual(sources(), [second, first]);
+  assert.equal(editor.getText().replace(/\s/g, ''), text.replace(/\s/g, ''));
+  await act(async () => editor.commands.undo());
+  assert.deepEqual(editor.getJSON(), original);
+  await act(async () => editor.commands.redo());
+  assert.deepEqual(sources(), [second, first]);
+  await act(async () => button(container, '수정 저장').click());
+  await waitFor(() => container.querySelector('output').textContent === '/posts/1');
+  const saved = readMockDatabase().posts[0];
+  assert.deepEqual(saved.images.map((image) => image.id).sort(), [10, 11]);
+  assert.ok(saved.content.indexOf(second) < saved.content.indexOf(first));
+});
+
+test('코드블록으로 이미지 이동과 외부 이미지 파일 드롭은 본문을 변경하지 않는다', async () => {
+  await login();
+  const db = readMockDatabase();
+  const url = 'data:image/png;base64,cG5n';
+  db.posts[0].images = [{ id: 10, image_url: url }];
+  db.posts[0].content = `![image](<${url}>)\n\n\`\`\`python\nprint(1)\n\`\`\``;
+  saveMockDatabase(db);
+  const { container } = await mountRoute('/posts/1/edit');
+  await waitFor(() => container.querySelector('[role=textbox]')?.editor);
+  const editor = container.querySelector('[role=textbox]').editor;
+  let imagePos, codePos;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name === 'image') imagePos = pos;
+    if (node.type.name === 'codeBlock') codePos = pos + 1;
+  });
+  // 첫 선택 시 편집기가 코드 뒤의 빈 문단을 보완한다. 이 초기 정규화 이후의 문서를 비교한다.
+  await act(async () => editor.commands.setNodeSelection(imagePos));
+  const original = editor.getJSON();
+  await dragImage(editor, imagePos, codePos);
+  assert.deepEqual(editor.getJSON(), original);
+  assert.match(container.textContent, /코드블록 바깥/);
+  const oldCoords = editor.view.posAtCoords;
+  try {
+    editor.view.posAtCoords = () => ({ pos: imagePos, inside: imagePos });
+    const drop = new window.MouseEvent('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: { files: [new File(['png'], 'new.png', { type: 'image/png' })], getData: () => '' } });
+    await act(async () => editor.view.dom.dispatchEvent(drop));
+    assert.deepEqual(editor.getJSON(), original);
+    assert.match(container.textContent, /이미지 버튼에서 선택/);
+  } finally { editor.view.posAtCoords = oldCoords; }
+});
 
 test('수정 시 쉼표 결합 태그를 분리하고 다른 원본 태그는 보존하며 말머리 변경을 반영한다', () => {
   const tags = ['질문', '밥친구', 'a,b', ' 태그 '].map((name, id) => ({ name, id }));

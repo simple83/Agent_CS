@@ -59,7 +59,26 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
         setMessage(imageAttachmentAvailable ? '이미지는 도구 모음의 이미지 버튼에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
         return true;
       },
-      handleDrop: (_view, event) => {
+      handleDrop: (view, event) => {
+        // 같은 편집기에서 시작한 드래그만 원본 노드로 이동한다. URL 재삽입이나 새 업로드를 하지 않는다.
+        if (view.dragging) {
+          let hasImage = false;
+          let hasCode = false;
+          view.dragging.slice.content.descendants((node) => {
+            if (node.type.name === 'image') hasImage = true;
+            if (node.type.name === 'codeBlock') hasCode = true;
+          });
+          if (hasImage || hasCode) {
+            if (disabled || !view.editable) return true;
+            const target = view.posAtCoords({ left: event.clientX, top: event.clientY });
+            if (target && view.state.doc.resolve(target.pos).parent.type.spec.code) {
+              setMessage(hasCode ? '코드블록은 다른 코드블록 바깥으로 옮겨주세요.' : '이미지는 코드블록 바깥으로 옮겨주세요.');
+              return true;
+            }
+            // 기본 이동 동작이 원래 노드를 제거하고 새 위치에 넣으며 실행 취소도 한 번으로 처리한다.
+            return false;
+          }
+        }
         if (!event.dataTransfer?.files.length) return false;
         setMessage(imageAttachmentAvailable ? '이미지는 도구 모음의 이미지 버튼에서 선택해 주세요.' : '이 입력창에서는 이미지 추가·교체를 지원하지 않습니다.');
         return true;
@@ -145,7 +164,25 @@ export const RichTextEditor = ({ content, onChange, disabled, imageAttachmentAva
   };
 
   return (
-    <section className={styles.editor} aria-label="본문 편집기">
+    <section className={styles.editor} aria-label="본문 편집기" onDragStartCapture={(event) => {
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      const codeBlock = target?.closest('[data-code-block-editor]');
+      // NodeView가 기본 이벤트를 가로채기 전에 검사한다. 핸들은 이후 Tiptap이 블록 전체를 선택한다.
+      if (!disabled && editor.isEditable && codeBlock && target?.closest('[data-drag-handle]')) return;
+
+      const { selection, doc } = editor.state;
+      let includesCode = Boolean(codeBlock);
+      // 일반 문단부터 코드 일부까지 걸친 선택도 바깥에서 끌어 분리할 수 없게 한다.
+      doc.nodesBetween(selection.from, selection.to, (node) => {
+        if (node.type.name === 'codeBlock') includesCode = true;
+      });
+      if (!includesCode) return;
+
+      // 드래그만 막고 선택 범위는 유지한다. 복사·잘라내기·키보드 편집에는 영향을 주지 않는다.
+      event.preventDefault();
+      event.stopPropagation();
+      setMessage('코드블록은 상단의 전체 이동 핸들을 끌어서 옮겨주세요.');
+    }}>
       {/* 모든 도구는 type=button으로 선언해 부모 폼을 제출하지 않는다. */}
       <div className={styles.toolbar} role="group" aria-label="본문 서식 도구">
         {variant === 'post' && <>

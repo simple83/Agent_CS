@@ -23,9 +23,13 @@ export const CodeBlockEditor = ({ node, updateAttributes, editor }: NodeViewProp
   };
 
   return (
-    <NodeViewWrapper className={styles.block}>
+    <NodeViewWrapper className={styles.block} data-code-block-editor="">
       <div className={styles.bar} contentEditable={false}>
         <span>코드블록</span>
+        {/* Tiptap의 핸들은 드래그 시작 시 이 블록 전체를 NodeSelection으로 지정한다.
+            코드 내용·언어 메뉴와 분리해 일부 코드나 다른 블록이 잘못 이동하지 않게 한다. */}
+        <span className={styles.dragHandle} data-drag-handle="" draggable={!disabled && editor.isEditable}
+          aria-disabled={disabled || !editor.isEditable} title="끌어서 코드블록 전체 이동">⠿ 전체 이동</span>
         <label className={styles.language}>언어
           <select className={styles.control} aria-label="코드블록 언어" value={language} disabled={disabled}
             onChange={changeLanguage}>

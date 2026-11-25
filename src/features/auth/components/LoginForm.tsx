@@ -6,13 +6,15 @@ import { Link } from 'react-router';
 
 interface LoginFormProps {
   onLoggedIn?: () => void;
+  /** 가입 화면을 거쳐도 원래 글쓰기 위치로 돌아갈 수 있도록 검증된 앱 경로를 전달한다. */
+  returnTo?: string;
 }
 
 /*
  * 입력값을 관리하고 로그인 처리는 useAuth에 맡긴다. 성공 후 화면 이동은 부모 콜백이 결정한다.
  * 입력 요소를 내부 함수 컴포넌트로 만들지 않아 재렌더링 시 입력 포커스가 유지된다.
  */
-export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
+export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn, returnTo = '/posts' }) => {
   const [accountId, setAccountId] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   
@@ -80,7 +82,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoggedIn }) => {
         )}
 
       </form>
-      <p className={styles.help}>계정이 없으신가요? <Link className={styles.link} to="/signup">회원가입</Link></p>
+      <p className={styles.help}>계정이 없으신가요? <Link className={styles.link} to="/signup" state={{ returnTo }}>회원가입</Link></p>
     </div>
   );
 };
