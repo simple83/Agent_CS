@@ -16,10 +16,23 @@ export const SignupForm = () => {
   const [confirmation, setConfirmation] = useState('');
   const { isLoading, error, registered, submit } = useSignup();
 
-  /** 기본 폼 이동을 막는다. 실패하면 입력을 보존하고 성공하면 비밀번호 상태를 해제한다. */
+  /**
+   * 자동완성·입력 복원은 onChange 없이 실제 입력칸만 바꿀 수 있으므로 제출 순간의 값을 읽는다.
+   * React 상태만 비교하면 화면과 다른 과거의 일치 값을 검증·전송할 수 있다.
+   * 검증과 API 요청에는 같은 스냅샷을 사용하고 실패 시에도 화면에 실제 입력값을 유지한다.
+   */
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (await submit({ account_id: accountId, password }, confirmation)) {
+    const form = event.currentTarget;
+    const readValue = (name: string) => (form.elements.namedItem(name) as HTMLInputElement | null)?.value ?? '';
+    const currentAccountId = readValue('account_id');
+    const currentPassword = readValue('password');
+    const currentConfirmation = readValue('password_confirmation');
+
+    setAccountId(currentAccountId);
+    setPassword(currentPassword);
+    setConfirmation(currentConfirmation);
+    if (await submit({ account_id: currentAccountId, password: currentPassword }, currentConfirmation)) {
       setPassword('');
       setConfirmation('');
     }

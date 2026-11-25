@@ -177,6 +177,36 @@ test('직접 가입 페이지 진입과 입력 오류·확인 불일치를 처�
   assert.match(container.querySelector('[role=alert]').textContent, /일치하지/);
 });
 
+for (const changedField of ['password', 'password_confirmation']) {
+  test(`자동완성 등으로 ${changedField}의 실제 값만 바뀌어도 불일치 가입 요청을 차단한다`, async () => {
+    window.history.replaceState(null, '', '/signup');
+    const { container } = await mount();
+    const calls = [];
+    authApi.signup = async (request) => {
+      calls.push(request);
+      return { user_id: 999, account_id: request.account_id, created_at: '2026-11-25' };
+    };
+    await input(container, '[name=account_id]', 'student');
+    await input(container, '[name=password]', 'password1');
+    await input(container, '[name=password_confirmation]', 'password1');
+
+    // 비밀번호 관리자/브라우저 입력 복원처럼 React onChange 없이 DOM 값만 바뀌는 상황을 재현한다.
+    const field = container.querySelector(`[name=${changedField}]`);
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(field, 'password2');
+    await submit(container);
+    assert.equal(calls.length, 0, '화면에 서로 다른 비밀번호가 있으면 API를 호출하면 안 된다.');
+    assert.match(container.querySelector('[role=alert]').textContent, /일치하지/);
+    assert.equal(container.querySelector(`[name=${changedField}]`).value, 'password2');
+
+    // 다시 일치시켰을 때도 예전 React 상태가 아닌 현재 입력한 값으로 요청한다.
+    await input(container, '[name=password]', 'password2');
+    await input(container, '[name=password_confirmation]', 'password2');
+    await submit(container);
+    assert.deepEqual(calls, [{ account_id: 'student', password: 'password2' }]);
+    assert.match(container.textContent, /회원가입 완료/);
+  });
+}
+
 test('중복 아이디 오류 후 입력을 보존하고 아이디를 바꿔 다시 가입한다', async () => {
   window.history.replaceState(null, '', '/signup');
   const { container } = await mount();
